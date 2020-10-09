@@ -1,0 +1,997 @@
+############################################
+#                                          #
+#    #####          ANGLE                  #
+#   #########                              #
+#   ##						OF             #
+#   #  #####                               #
+#   # ### # #					   DEATH   #
+#   #  #####							   #
+############################################
+
+
+:alias Tx  vD	# target X
+:alias Ty  vC	# target Y
+:alias Tr  vB   # Rotation
+:alias TrZ vA   # Rotation Zone
+:alias frame_stepper v9
+# v8
+:alias show_playerxy v7
+
+# Non critical frame to frame
+:alias on_axis v3
+:alias off_axis v4
+# Convinience
+:alias cross_x v0
+:alias cross_y v1
+
+## Calculate gameplay dimensions:
+
+:calc zone { 7 * 8 }
+
+:calc UL_X { -1 + ( 128 - zone ) / 2 }
+:calc UL_Y { -1 + ( 64 -  zone ) / 2 }
+:calc UL_Y_plus1 { UL_Y + 1 }
+
+:calc LL_Y { 0 + ( 64 +  zone ) / 2 }
+
+:calc UR_X { 0 + ( 128 + zone ) / 2 }
+
+:calc UR_Max8 { UL_X + zone }
+:calc LL_Max8 { UL_Y_plus1 + zone }
+
+
+#########
+		#
+		# The big redo
+		#
+		#########
+		# Positive Axes:
+		#
+		#      x--->  @ = 0
+		#      |
+		#      V
+		#
+		# The signs on the axes reflect a typical 'I'm a graph' sort of layout
+		# with 0 pointing down the X axis
+		# We can set a flag based on if the effect of the angle is inverted
+		# We can set a flag based on if the axes are flipped
+		# We can set a flag on if we are the 'opposite' of the regular line
+		# But these flags don't help us really... pick stuff on their own
+		# The main axis maximum is a combation of two flags
+		# The off axis maximum is again, a combination
+		# When we flip the axes, this is an X = Y mirror
+		# But we could still identify the regions
+		#
+		#   -    110 | 111    -
+		#      -     |     -
+		#   100   -  |  -   001
+		#  --------- X ----------  0 
+		#   101   -  |  -   000
+		#      -     |     -
+		#   -    011 | 010    -
+		#
+		# But these don't increment naturally at all
+		# Unless we pick a diagonal as 0, we run into a lot of problems when
+		# incrementing the zones in a circle in terms of if inidividual flags mean things to us
+		#                          
+		#   -    100 | 101    -  
+		#      -     |     -
+		#   011   -  |  -   110
+		#  --------- X ----------
+		#   010   -  |  -   111
+		#      -     |     -
+		#   -    001 | 000    -
+		#                        0
+		# But this kind of works
+		# Bit 1 always reflects a mirroring around the on axis line
+		# Bit 2 always corresponds with the on axis being horizontal vs vertical
+		# Bit 3 always corresponds with mirroring both the off axis line and on axis, or, adding 180 degrees
+		# By picking which diagonal 0 is, we can pick things to line up with 'positive' axes
+		# And treat the first bit being 0 as being our 'backwards' tan
+		# Plus, we can use these in a jump table to correctly 
+		# If we wanted to do this
+		# jump [address] is a 2 byte instrunction
+
+		# We can pick the order of +ve on axis values, if we accept clockwise, so, let's go ahead and do this:
+		#                        0 
+		#   -   1100 | 1110   -  
+		#      -     |     -
+		#   1010  -  |  -   0000
+		#  --------- X ----------
+		#   1000  -  |  -   0010
+		#      -     |     -
+		#   -   0110 | 0100   -
+		#                        
+
+		# We need to position our crosshairs on the border of our boundry square now
+		# We have the current angle in Tr and the current zone in jumpable format in TrZ
+
+		# We will already have the rotation table set correctly, so, we don't need to worry about that
+
+: main
+	clear
+	hires
+
+	generate_tan_table
+	generate_offaxis_max_table
+
+	draw_game_box
+
+	Tx := 64
+	Ty := 32
+	Tr := 0
+	TrZ := 0b0010
+
+	draw_crosshairs_from_memory
+
+	update_trz_code
+
+	v0 := TrZ
+	v2 := Tr
+
+	jump0 update_rotation_code
+
+	loop
+
+		v0 := 0 if v0 key begin
+			:breakpoint q
+			v0 += 1
+		end
+
+		# Let's handle input:
+		# It would be handy to know if the player has not pushed any input
+
+		#v0 := 1   if v0 key then show_playerxy += 0x80
+
+		:alias detect_rot v5
+		:alias player_input v6
+
+		player_input := 0
+		
+		detect_rot := Tx
+		v0 := 7   if v0 key then Tx += -1 # keyboard A
+		v0 := 9   if v0 key then Tx +=  1 # keyboard D
+		if Tx != detect_rot then player_input += 1
+
+		detect_rot := Ty
+		v0 := 5   if v0 key then Ty += -1 # keyboard W
+		v0 := 8   if v0 key then Ty +=  1 # keyboard S
+		if Ty != detect_rot then player_input += 1
+
+		# We only have to run this code if they push a button:
+		if player_input == 0 then jump service_rot
+
+		# Gate player until we have a better option:
+		if Tx == UL_X then jump backtrack_right # ie, go right
+		if Tx == UR_X then jump backtrack_left
+		: backtrack_lr_return
+		if Ty == UL_Y then jump backtrack_down
+		if Ty == LL_Y then jump backtrack_up
+		: backtrack_ud_return
+
+		# We will use v5 to indicate we're trying to change rotation:
+
+		: service_rot
+		detect_rot := Tr
+		v0 := 4   if v0 key then Tr += -1 # keyboard Q
+		v0 := 6   if v0 key then Tr +=  1 # keyboard E
+		# Skip rotation update if rotation is unchanged:
+		if detect_rot == Tr then jump update_rotation_code_return
+
+		# Here, if detect_rot is 0 and player_input is 0 then we
+		# don't need to update our positions
+
+		# if player_input is 1 but detect_rot is 0 then we don't need
+		# to update rot
+
+		# if player_input is 0 but detect_rot is 1, then we still
+		# need to update stuff
+
+		# 0 0 nothing
+		# 1 0 pos only
+		# ? 1 both
+
+		# begin
+			# This code runs only on r change
+			player_input += 1
+
+			if Tr == 45 begin
+				Tr := 0
+				TrZ += 0b010
+				if TrZ == 0b010000 then TrZ := 0
+				update_trz_code
+			end
+			if Tr == -1 begin
+				Tr := 44
+				TrZ -= 0b010 # mm sugar
+				if TrZ == 0b11111110 then TrZ := 0b001110
+				update_trz_code
+			end
+			# Rotation must have changed for us to be here:
+			# if __1_, then Tr can be used to index into the tan table normally
+			# if __0_, then the correct value is 45 - Tr
+
+			# Here's a mad solution:
+			v0 := TrZ
+			v2 := Tr
+			jump0 update_rotation_code
+		# end
+		: update_rotation_code_return
+			# Here, we KNOW that the player pushed something
+			# Can we all directly into the update code?
+
+		# Undraw the existing cursors:
+		draw_crosshairs_from_memory
+
+		# Perform duty cycle
+		i := frame_cycle_count
+		load v0
+		v0 += 0b00010000
+		if v0 == 0 then frame_stepper += 0x80
+		i := frame_cycle_count
+		save v0
+		
+		# If player_input is true then we must redraw
+		# if it is 0 then we can use saved values
+		if player_input == 0 begin
+			# DONT UPDATE STUFF:
+			draw_crosshairs_from_memory
+			jump bypass_crosshair_update
+		end
+
+		############ UPDATE STUFF
+		# Calculate first:
+		DoFirstCrosshair
+		apply_on_axis_main
+		# cross_x and y are v0 and v1
+		i := crosshair_1_data
+		save cross_y
+
+		i := crosshair_b
+		if frame_stepper != 0 then i := crosshair_a
+		sprite cross_x cross_y 3
+
+		DoSecondCrosshair
+		apply_on_axis_flipped
+
+		i := crosshair_2_data
+		save cross_y
+
+		i := crosshair_a
+		if frame_stepper != 0 then i := crosshair_b
+		sprite cross_x cross_y 3
+
+		: bypass_crosshair_update
+
+		#i := crosshair_p
+		#if show_playerxy != 0 then sprite Tx Ty 3
+
+		vf := 2
+		delay := vf
+		loop
+			vf := delay
+			if vf != 0 then
+		again
+
+		#i := crosshair_p
+		#if show_playerxy != 0 then sprite Tx Ty 3
+
+		i := long register_dump
+		save vF
+
+
+
+
+	again
+
+
+
+
+	jump main
+
+: frame_cycle_count
+  0
+
+: draw_crosshairs_from_memory
+	i := crosshair_1_data
+	load cross_y
+	i := crosshair_b
+	if frame_stepper != 0 then i := crosshair_a
+	sprite cross_x cross_y 3
+
+	i := crosshair_2_data
+	load cross_y
+	i := crosshair_a
+	if frame_stepper != 0 then i := crosshair_b
+	sprite cross_x cross_y 3
+;
+
+: crosshair_1_data
+ 0x5b 0x1F 0
+: crosshair_2_data
+ 0x22 0x1F 0
+
+: apply_on_axis_main
+	: simple_axis_apply_target_A
+	vF := vF
+	vF := vF
+;
+
+: apply_on_axis_flipped
+	: simple_axis_apply_target_B
+	vF := vF
+	vF := vF
+;
+
+: DoSecondCrosshair
+	v0 := TrZ
+	vF := 0b1000
+	v0 ^= vF
+	jump0 SetupOnAxis	# Note shared return path
+
+: DoFirstCrosshair
+	v0 := TrZ
+	jump0 SetupOnAxis
+	############ ->>>>>>>>>>>>
+
+	: AxesReturnPoint
+
+	cross_x := Tx
+	cross_x -= 1
+	cross_y := Ty
+	cross_y -= 1
+;
+
+
+
+: backtrack_right
+	# Player is trying to move into left wall, we want to backtrack them up the line, if we can
+	# Fix Tx
+	backtrack_unified
+	if v2 == 1 then Tx += 1
+	jump backtrack_lr_return	
+: backtrack_left
+	backtrack_unified
+	if v2 == 1 then Tx -= 1
+	jump backtrack_lr_return
+: backtrack_up
+	backtrack_unified
+	if v2 == 1 then Ty -= 1
+	jump backtrack_ud_return
+: backtrack_down
+	backtrack_unified
+	if v2 == 1 then Ty += 1
+	jump backtrack_ud_return
+
+: backtrack_unified
+	set_i_to_offaxis
+	off_axis := 1
+	i += off_axis
+
+	# Load the on_axis value that corresponds with 1 px off axis
+	load v0
+
+	# We can figure out 
+	on_axis := v0
+
+	v2 := 1
+
+	cross_x := Tx
+	cross_y := Ty
+
+	apply_on_axis_main
+
+	# Is this result better for us? We actually don't know right now what
+	# direction is beneficial so we kind of have to check all of them
+	# but this code does only trigger when the player is trying to move into a wall
+
+	check_backtrack_result
+
+	if v2 == 0 then return
+
+	cross_x := Tx
+	cross_y := Ty
+
+	apply_on_axis_flipped
+
+	check_backtrack_result
+;
+
+
+: check_backtrack_result
+	if v0 <= UL_X then jump backtrack_bad_result
+	if v0 >= UR_X then jump backtrack_bad_result
+	if v1 <= UL_Y then jump backtrack_bad_result
+	if v1 >= LL_Y then jump backtrack_bad_result
+
+	Tx := v0
+	Ty := v1
+
+	v2 := 0
+
+	: backtrack_bad_result
+;
+
+
+
+: SetupOnAxis
+# 0000 # On axis: +X, off axis -Y
+jump SetupOnPosX
+# 0010 # On axis: +X, off axis +Y
+jump SetupOnPosX
+# 0100 # On axis: +Y, off axis +X
+jump SetupOnPosY
+# 0110 # On axis: +Y, off axis -X
+jump SetupOnPosY
+# 1000 # On axis: -X, off axis +Y
+jump SetupOnNegX
+# 1010 # On axis: -X, off axis -Y
+jump SetupOnNegX
+# 1100 # On axis: -Y, off axis -X
+jump SetupOnNegY
+# 1110 # On axis: -Y, off axis +X
+jump SetupOnNegY
+
+: SetupOffAxis
+# 0000 # On axis: +X, off axis -Y
+jump SetupOffNegY
+# 0010 # On axis: +X, off axis +Y
+jump SetupOffPosY
+# 0100 # On axis: +Y, off axis +X
+jump SetupOffPosX
+# 0110 # On axis: +Y, off axis -X
+jump SetupOffNegX
+# 1000 # On axis: -X, off axis +Y
+jump SetupOffPosY
+# 1010 # On axis: -X, off axis -Y
+jump SetupOffNegY
+# 1100 # On axis: -Y, off axis -X
+jump SetupOffNegX
+# 1110 # On axis: -Y, off axis +X
+jump SetupOffPosX
+
+# 0000
+		# On axis: +X, off axis -Y
+: SetupOnPosX
+	on_axis := UR_X
+	on_axis -= Tx
+	jump0 SetupOffAxis
+
+: SetupOnNegX
+	on_axis := Tx
+	on_axis -= UL_X
+	jump0 SetupOffAxis
+
+: SetupOnPosY
+	on_axis := LL_Y
+	on_axis -= Ty
+	jump0 SetupOffAxis
+
+: SetupOnNegY
+	on_axis := Ty
+	on_axis -= UL_Y
+	jump0 SetupOffAxis
+
+
+: SetupOffPosX
+	off_axis := UR_X
+	off_axis -= Tx
+	jump get_off_axis
+
+: SetupOffNegX
+	off_axis := Tx
+	off_axis -= UL_X
+	jump get_off_axis
+
+: SetupOffPosY
+	off_axis := LL_Y
+	off_axis -= Ty
+	jump get_off_axis
+
+: SetupOffNegY
+	off_axis := Ty
+	off_axis -= UL_Y
+	jump get_off_axis
+
+
+: draw_game_box
+
+	v0 := UL_X
+
+	v1 := UL_Y
+	v2 := LL_Y
+
+	i := line_h
+
+	loop
+		sprite v0 v1 1
+		sprite v0 v2 1
+
+		v0 += 8
+		if v0 != UR_Max8 then
+	again
+
+	i := line_h_2
+	sprite v0 v1 1
+	sprite v0 v2 1
+
+	
+
+	v0 := UL_X
+	v1 := UR_X
+	v2 := UL_Y_plus1
+
+	i := line_v
+
+	loop
+		sprite v0 v2 8
+		sprite v1 v2 8
+
+		v2 += 8
+		if v2 != LL_Max8 then
+	again
+
+;
+
+: get_off_axis
+	# Takes:
+	# on_axis: the large value of the triangle
+	# off_axis: the maximun acceptable value for the triangle
+
+	# Returns:
+	# on_axis on final axis vector
+	# off_axis off final axis vector
+	# 
+
+	:alias work_rot v2
+	:alias WIP_off v5
+
+	# Yep you guessed it self modifying code:
+	:next quick_rot_for_axis
+	work_rot := 0x00
+
+	# if they're literally presenting a 0 degree angle, then, we have no off axis to calculate
+	if work_rot == 0 begin
+		off_axis := 0
+		# Obviously, this is already the case:
+		# on_axis := on_axis
+		jump AxesReturnPoint
+	end
+
+	if work_rot == 45 begin
+		# This case is a little more complicated, but in essence
+
+		# What on and off axis are is... vague
+		# But if either axis is less than the other then that's the minimum
+
+		if on_axis > off_axis then on_axis := off_axis
+		if off_axis > on_axis then off_axis := on_axis
+		jump validated_off_axis
+		end
+	
+	
+	# Also modify our backup plan memory read as this is the unadjusted base of the table
+	# This is whe data we want to adjust:
+	: offaxis_mem_read_base
+	i := long quick_tan_table
+	:calc offaxis_mem_read { offaxis_mem_read_base + 2 }
+
+	# We could load v1 at this time to obtain subpixels per step if we want it
+
+	i += on_axis
+	i += on_axis
+
+	load v1
+	# v0 will be total off axis displacement
+	# v1 will be the remainder subpixels
+
+	WIP_off := v0
+
+	
+	if WIP_off > off_axis begin
+		# :breakpoint z
+		# unfortunately, this exceeds our stated maximum
+		# We could raycast however we can also precompute the best result
+		# for every one of these, like we do for the on_axis read
+
+		WIP_off := off_axis
+		0xF0 00
+		: off_axis_table_address
+		0 0
+
+		i += off_axis
+		load v0
+
+		:monitor off_axis_table_address 2
+		# We must not exend on access though:
+		if v0 < on_axis then on_axis := v0
+	end
+	# otherwise this is a perfectly find on axis length
+	off_axis := WIP_off
+
+	: validated_off_axis
+	# If this off axis in excess of our maximum?
+	# Who knows
+	jump AxesReturnPoint
+
+
+: set_i_to_offaxis
+	0xF0 00
+	: mem_generic_off_axis
+	0 0
+;
+
+
+
+# This is a jump table
+# We are going to receive one of the 8 zones here:
+# Uses up code, but is in principal faster than anding out the bits.
+# Maybe
+# jump0 -> jumpT -> Entry
+# vF := 0b10 -> vf &= TrZ -> if vf then Entry / Entry
+: update_rotation_code
+	jump flip_rotation
+	jump leave_rotation
+
+	jump flip_rotation
+	jump leave_rotation
+
+	jump flip_rotation
+	jump leave_rotation
+
+	jump flip_rotation
+	jump leave_rotation
+	# Rotation must have changed for us to be here:
+	# if __0_, then the correct value is 45 - Tr
+	# if __1_, then Tr can be used to index into the tan table normally
+
+# v0 will be a safe copy of TrZ
+# v2 is a copy of the rotation
+: flip_rotation
+	v1 := 45
+	v2 =- v1
+: leave_rotation
+	# At this time v2 now contains our correct rotation value for our tables:
+	
+	# The values are:
+	# v0: A copy of TrZ
+	# v1: ?????
+	# v2: Rotation to use for quick_tan
+
+	# We need to obtain the memory address of the pregenerated memory from quick_tan
+	i := quick_tan
+	# Add rotation, twice:
+	i += v2
+	i += v2
+	load v1
+	# v0 v1 now contain the correct value for the starting memory address for this rotation
+
+	i := offaxis_mem_read
+	save v1
+
+	#:breakpoint test
+	i := quick_off_axis
+	i += v2
+	i += v2
+	load v1
+	i := off_axis_table_address
+	save v1
+	i := mem_generic_off_axis
+	save v1
+
+	# Also, set the value for rotation in get_off_axis:
+	v0 := v2
+	i := quick_rot_for_axis
+	save v0
+
+	jump update_rotation_code_return
+
+	# Technically we only need to like, do this, if TrZ has changed:
+: update_trz_code
+	# put a doubled version in vE
+	vE := TrZ
+	vE += TrZ
+
+	i := long simple_axis_apply
+	i += vE
+	load v3
+
+	i := simple_axis_apply_target_A
+	save v3
+
+	# put the correct value to bitflip to the opposrite side:
+	vF := 0b10000
+	vE ^= vF
+	i := long simple_axis_apply
+	i += vE
+	load v3
+
+	i := simple_axis_apply_target_B
+	save v3
+
+	# Then we must return, and, we jumped here, so
+;
+
+
+
+# So let's do it with actual code, at run time, because we can!
+: generate_tan_table
+	# I want to generate a table of
+	# whole px, subpx for each distance value, per angle
+	# Max distance is 8 * 7, so let's assume ~63 for easy data stride
+	# Angle is from (in principal) 0 to in principal (45)
+	# But we start with 1 because 0 is... all 0s
+
+	Tr := 1
+
+	loop
+		# Pull our incrimental subpixel value for this rotation:
+		i := long tan_table
+		i += Tr
+		load v0
+
+		# I have a problem.
+		# I want to self modify this code:
+		: tangen_address_base
+		i := long quick_tan_table
+		:calc code_tangen_address { tangen_address_base + 2 }
+		# fortunately we modify this AFTER we have already used it, later in this loop
+		# Otherwise I can't use calc?
+
+		:monitor tangen_address_base 8
+
+		# Register set up per pass:
+		v1 := 0x80
+		v3 := 0
+		# Copy subpixels to another, safe register:
+		v5 := v0 # v5 will be subpix remainder
+		v0 := 0  # v0 will be total displacement
+
+		# We will have I pointing at the correct location of this extended tan data
+		# We save the 0 value to prevent complicated maths. Same reason we start with r 0
+
+		loop
+			# Save current data:
+			save v1
+
+			# Incriment subpixels:
+			v1 += v5
+			# If this overflows, we increase displacement in v0
+			if vf != 0 then v0 += 1
+
+			# v3 counts up:
+			v3 += 1
+			# Do this 63 times:
+			if v3 != 64 then
+		again
+
+		i := code_tangen_address
+		load v1
+
+		# We now have the memory address of the data for quick_tan_table + r * 128 in our v0 and v1
+		# Turns out we want that in our quicktan table:
+		i := quick_tan
+		# Incriment I by 2x Tr
+		i += Tr
+		i += Tr
+		save v1
+		
+		# Then work out the next address:
+		v2 := 0x80
+		v1 += v2
+		if vf != 0 then v0 += 1
+
+		# Then we save that into our next pass's I command so we work out the next piece of data
+		i := code_tangen_address
+		save v1
+
+		# Step forward I:
+		Tr += 1
+
+		# OK I now have a mad table
+
+		if Tr != 45 then
+	again
+;
+
+: generate_offaxis_max_table
+	# So, we also want a table that allows us to figure out the maximum value 
+	# of an on_axis line if the off_axis has to be clamped to some lower value
+	# We could either search through the displacement data (eg as a binary search)
+	# or we can create a table that gives us the answer
+
+	Tr := 1
+
+	# Steal the last valid good memory address from the other function:
+	i := code_tangen_address
+	load v1
+	i := offaxis_gen_memory_target
+	save v1
+
+	# We could use our existing table to work this out but it's actually slightly
+	# easier to work from scratch
+	# typical offset is quick_tan_table + 5632
+	loop
+		i := tan_table
+		i += Tr
+		load v0
+		v5 := v0
+
+		# v0 as on_axis will be the maximum value that we can count to before we overflow to the next pixel.
+		v0 := 0
+		# off axis:
+		off_axis := 0
+
+		# This time, subpixels will be 0:
+		v2 := 0x00
+		
+		# We will use the overflow to indicate when we've found the next 
+
+		# i := long
+		0xF0 00
+		: offaxis_gen_memory_target
+		00 00
+
+		# if you want to go 0 px off axis, you can go... 0?
+		save v0
+
+		loop
+			v0 += 1
+			v2 += v5
+			if vF != 0 begin
+				# the current value of on axis is the maximum value for this off axis
+				save v0
+				# i will step on by off_axis amount
+				off_axis += 1
+				end
+
+
+			if v0 != 63 then
+		again
+
+		save v0
+		off_axis += 1
+
+		v0 := 0xFF
+		save v0
+		off_axis += 1
+
+		i := offaxis_gen_memory_target
+		load v1
+
+		# update the table, I guesss!!!
+
+		i := quick_off_axis
+		i += Tr
+		i += Tr
+		save v1
+
+		v1 += off_axis
+		v0 += vF
+		i := offaxis_gen_memory_target
+		save v1
+
+		Tr += 1
+
+		if Tr != 45 then
+	again
+	
+
+;
+
+# Ideally these will live in low memory
+: crosshair_a
+0b10100000
+0b00000000
+0b10100000
+
+: crosshair_b
+0b11100000
+0b11100000
+0b11100000
+
+
+
+
+
+
+: simple_axis_apply
+# 0000 # On axis: +X, off axis -Y
+cross_x += on_axis
+cross_y -= off_axis
+
+# 0010 # On axis: +X, off axis +Y
+cross_x += on_axis
+cross_y += off_axis
+
+# 0100 # On axis: +Y, off axis +X
+cross_y += on_axis
+cross_x += off_axis
+
+# 0110 # On axis: +Y, off axis -X
+cross_y += on_axis
+cross_x -= off_axis
+
+# 1000 # On axis: -X, off axis +Y
+cross_x -= on_axis
+cross_y += off_axis
+
+# 1010 # On axis: -X, off axis -Y
+cross_x -= on_axis
+cross_y -= off_axis
+
+# 1100 # On axis: -Y, off axis -X
+cross_y -= on_axis
+cross_x -= off_axis
+
+# 1110 # On axis: -Y, off axis +X
+cross_y -= on_axis
+cross_x += off_axis
+
+: line_h
+0xFF
+: line_h_2
+0b11000000
+
+: line_v
+0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80
+
+##################################
+
+# Yeah ok, so I wanted to try and use macros and calc to work out things.
+# But because I have to put them at the end of my rom, and I can't forward reference them
+# Like I can't put a label at the end here, do a calc of that + 128, and use it earlier in the program
+# I genuinely have no idea how they bahave, or what tehy're going to do
+# So, I just can't use them
+
+# This did work but I'm replacing it with a fixed data table because I don't know how it would impact the labels
+# I wanted to use that would follow it:
+#:macro d0     X { X X X X X }
+#:macro do-45 X { d0 X d0 X d0 X d0 X d0 X d0 X d0 X d0 X d0 X }
+#:macro tan-entry {
+#	:byte { 256 * tan ( ( HERE - tan_table ) * PI / 180 ) }
+#}
+#: tan_table
+#	do-45 tan-entry
+
+: tan_table # 45 bytes that represent subpixels on the offaxis when incrimenting adjacent by 1
+ 0x00 0x04 0x08 0x0D 0x11 0x16 0x1A 0x1F 
+ 0x23 0x28 0x2D 0x31 0x36 0x3B 0x3F 0x44 
+ 0x49 0x4E 0x53 0x58 0x5D 0x62 0x67 0x6C 
+ 0x71 0x77 0x7C 0x82 0x88 0x8D 0x93 0x99 
+ 0x9F 0xA6 0xAC 0xB3 0xB9 0xC0 0xC8 0xCF 
+ 0xD6 0xDE 0xE6 0xEE 0xF7
+
+: quick_tan # This will be 90 bytes of address information that will correspond with the memory address of 
+			# saved off axis positions and subpixels for all rotations from 0 to 45
+			# This allows us to load I with quick_tan, add r (0-45) * 2, pull the address
+			# set I to that vlaue, and then I += main axis length, and get the off axis
+
+			# Obviously we're going to generate this with code
+			# So here come the 0s!
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 32
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 64
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 # 90
+
+ : quick_off_axis
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 32
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 64
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 # 90
+
+
+
+: register_dump
+ 0 0 0 0 0 0 0 0 
+ 0 0 0 0 0 0 0 0 
+
+:monitor register_dump 16
+
+
+
+: quick_tan_table
+ 	# This will be a ~ 5kb data structure of all our data
+
+:calc probably_offaxis_data { quick_tan_table + 44 * 128 }
+#:monitor probably_offaxis_data 128
+#:monitor quick_off_axis 90
+
