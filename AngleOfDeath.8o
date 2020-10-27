@@ -1139,8 +1139,6 @@ jump SetupOffPosX
 	# vD mob_draw_x
 	# vE 
 
-	:breakpoint a
-
 	:alias mob_frame v2
 	:alias mob_x v3
 	:alias mob_y v4
@@ -1353,6 +1351,7 @@ jump SetupOffPosX
 
 	# I guess maybe we have to loop this till we find an empty space?
 	# Note that this should be a multiple of 16 in order to work
+	: retry_get_empty_position
 	i := random_mob_position
 	load v0
 	v0 += 2
@@ -1363,9 +1362,21 @@ jump SetupOffPosX
 	load v1
 	# next X Y coords loaded into v0 v1
 	# Set the enemy to these coords
-
 	i := enemy_template_save_target
 	save v3
+
+	# Check this cell is actaully available:
+	address_game_cell 
+	# If not:
+	if v0 != -1 then jump retry_get_empty_position
+
+	# If yes:
+	# Register this enemy to this location:
+
+	i := game_grid
+	i += v1
+	v0 := vE
+	save v0
 
 	i := enemy_template
 	load v7
