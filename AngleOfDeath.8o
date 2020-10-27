@@ -15,7 +15,8 @@
 :alias TrZ vA   # Rotation Zone
 :alias frame_stepper v9
 # v8
-:alias show_playerxy v7
+# v7
+
 
 # Non critical frame to frame
 :alias on_axis v3
@@ -24,12 +25,15 @@
 :alias cross_x v0
 :alias cross_y v1
 
+:alias subpx_step v5
+
 ## Calculate gameplay dimensions:
 
 :calc zone { 7 * 8 }
 
 :calc UL_X { -1 + ( 128 - zone ) / 2 }
 :calc UL_Y { -1 + ( 64 -  zone ) / 2 }
+:calc UL_X_plus1 { UL_X + 1 }
 :calc UL_Y_plus1 { UL_Y + 1 }
 
 :calc LL_Y { 0 + ( 64 +  zone ) / 2 }
@@ -41,82 +45,92 @@
 
 
 #########
-		#
-		# The big redo
-		#
-		#########
-		# Positive Axes:
-		#
-		#      x--->  @ = 0
-		#      |
-		#      V
-		#
-		# The signs on the axes reflect a typical 'I'm a graph' sort of layout
-		# with 0 pointing down the X axis
-		# We can set a flag based on if the effect of the angle is inverted
-		# We can set a flag based on if the axes are flipped
-		# We can set a flag on if we are the 'opposite' of the regular line
-		# But these flags don't help us really... pick stuff on their own
-		# The main axis maximum is a combation of two flags
-		# The off axis maximum is again, a combination
-		# When we flip the axes, this is an X = Y mirror
-		# But we could still identify the regions
-		#
-		#   -    110 | 111    -
-		#      -     |     -
-		#   100   -  |  -   001
-		#  --------- X ----------  0 
-		#   101   -  |  -   000
-		#      -     |     -
-		#   -    011 | 010    -
-		#
-		# But these don't increment naturally at all
-		# Unless we pick a diagonal as 0, we run into a lot of problems when
-		# incrementing the zones in a circle in terms of if inidividual flags mean things to us
-		#                          
-		#   -    100 | 101    -  
-		#      -     |     -
-		#   011   -  |  -   110
-		#  --------- X ----------
-		#   010   -  |  -   111
-		#      -     |     -
-		#   -    001 | 000    -
-		#                        0
-		# But this kind of works
-		# Bit 1 always reflects a mirroring around the on axis line
-		# Bit 2 always corresponds with the on axis being horizontal vs vertical
-		# Bit 3 always corresponds with mirroring both the off axis line and on axis, or, adding 180 degrees
-		# By picking which diagonal 0 is, we can pick things to line up with 'positive' axes
-		# And treat the first bit being 0 as being our 'backwards' tan
-		# Plus, we can use these in a jump table to correctly 
-		# If we wanted to do this
-		# jump [address] is a 2 byte instrunction
+#
+# The big redo
+#
+#########
+# Positive Axes:
+#
+#      x--->  @ = 0
+#      |
+#      V
+#
+# The signs on the axes reflect a typical 'I'm a graph' sort of layout
+# with 0 pointing down the X axis
+# We can set a flag based on if the effect of the angle is inverted
+# We can set a flag based on if the axes are flipped
+# We can set a flag on if we are the 'opposite' of the regular line
+# But these flags don't help us really... pick stuff on their own
+# The main axis maximum is a combation of two flags
+# The off axis maximum is again, a combination
+# When we flip the axes, this is an X = Y mirror
+# But we could still identify the regions
+#
+#   -    110 | 111    -
+#      -     |     -
+#   100   -  |  -   001
+#  --------- X ----------  0 
+#   101   -  |  -   000
+#      -     |     -
+#   -    011 | 010    -
+#
+# But these don't increment naturally at all
+# Unless we pick a diagonal as 0, we run into a lot of problems when
+# incrementing the zones in a circle in terms of if inidividual flags mean things to us
+#                          
+#   -    100 | 101    -  
+#      -     |     -
+#   011   -  |  -   110
+#  --------- X ----------
+#   010   -  |  -   111
+#      -     |     -
+#   -    001 | 000    -
+#                        0
+# But this kind of works
+# Bit 1 always reflects a mirroring around the on axis line
+# Bit 2 always corresponds with the on axis being horizontal vs vertical
+# Bit 3 always corresponds with mirroring both the off axis line and on axis, or, adding 180 degrees
+# By picking which diagonal 0 is, we can pick things to line up with 'positive' axes
+# And treat the first bit being 0 as being our 'backwards' tan
+# Plus, we can use these in a jump table to correctly 
+# If we wanted to do this
+# jump [address] is a 2 byte instrunction
 
-		# We can pick the order of +ve on axis values, if we accept clockwise, so, let's go ahead and do this:
-		#                        0 
-		#   -   1100 | 1110   -  
-		#      -     |     -
-		#   1010  -  |  -   0000
-		#  --------- X ----------
-		#   1000  -  |  -   0010
-		#      -     |     -
-		#   -   0110 | 0100   -
-		#                        
+# We can pick the order of +ve on axis values, if we accept clockwise, so, let's go ahead and do this:
+#                        0 
+#   -   1100 | 1110   -  
+#      -     |     -
+#   1010  -  |  -   0000
+#  --------- X ----------
+#   1000  -  |  -   0010
+#      -     |     -
+#   -   0110 | 0100   -
+#                        
 
-		# We need to position our crosshairs on the border of our boundry square now
-		# We have the current angle in Tr and the current zone in jumpable format in TrZ
+# We need to position our crosshairs on the border of our boundry square now
+# We have the current angle in Tr and the current zone in jumpable format in TrZ
 
-		# We will already have the rotation table set correctly, so, we don't need to worry about that
+# We will already have the rotation table set correctly, so, we don't need to worry about that
+
+:alias enemy_data_size v7
+:alias enemy_data_simple_save v2
 
 : main
+	
+	# pick a random start point
+	v0 := random 0b01111110
+	i := random_mob_position
+	save v0
+
 	clear
 	hires
 
+	# Generate quick off_axis table
 	generate_tan_table
 	generate_offaxis_max_table
 
 	draw_game_box
-
+	
 	Tx := 64
 	Ty := 32
 	Tr := 0
@@ -141,13 +155,13 @@
 		# Let's handle input:
 		# It would be handy to know if the player has not pushed any input
 
-		#v0 := 1   if v0 key then show_playerxy += 0x80
-
 		:alias detect_rot v5
 		:alias player_input v6
 
 		player_input := 0
 		
+		v0 := 0xE if v0 key then jump trigger_pull
+
 		detect_rot := Tx
 		v0 := 7   if v0 key then Tx += -1 # keyboard A
 		v0 := 9   if v0 key then Tx +=  1 # keyboard D
@@ -226,11 +240,14 @@
 		# Perform duty cycle
 		i := frame_cycle_count
 		load v0
-		v0 += 0b00010000
-		if v0 == 0 then frame_stepper += 0x80
+		v0 += 8
+		if v0 == 64 begin
+			v0 := 0
+			frame_stepper += 0x80
+		end
 		i := frame_cycle_count
 		save v0
-		
+
 		# If player_input is true then we must redraw
 		# if it is 0 then we can use saved values
 		if player_input == 0 begin
@@ -242,20 +259,26 @@
 		############ UPDATE STUFF
 		# Calculate first:
 		DoFirstCrosshair
+		: apply_on_axis_main_memory
 		apply_on_axis_main
 		# cross_x and y are v0 and v1
+
+		# it is INCREDIBLY helpful to retain the original axis values
+		: address_crosshair_1_data_memory
 		i := crosshair_1_data
-		save cross_y
+		save off_axis
 
 		i := crosshair_b
 		if frame_stepper != 0 then i := crosshair_a
 		sprite cross_x cross_y 3
 
 		DoSecondCrosshair
+		: apply_on_axis_flipped_memory
 		apply_on_axis_flipped
 
+		: address_crosshair_2_data_memory
 		i := crosshair_2_data
-		save cross_y
+		save off_axis
 
 		i := crosshair_a
 		if frame_stepper != 0 then i := crosshair_b
@@ -263,18 +286,18 @@
 
 		: bypass_crosshair_update
 
-		#i := crosshair_p
-		#if show_playerxy != 0 then sprite Tx Ty 3
+		# Let's service enemies in the field
+		# We don't need to process them all
+		# But we do need to process them at all
+
+		## v0 is our current frame cycle value
+
+		service_enemy
+
+		: trigger_return
 
 		vf := 2
-		delay := vf
-		loop
-			vf := delay
-			if vf != 0 then
-		again
-
-		#i := crosshair_p
-		#if show_playerxy != 0 then sprite Tx Ty 3
+		f_delay
 
 		i := long register_dump
 		save vF
@@ -292,6 +315,7 @@
 : frame_cycle_count
   0
 
+
 : draw_crosshairs_from_memory
 	i := crosshair_1_data
 	load cross_y
@@ -307,10 +331,20 @@
 ;
 
 : crosshair_1_data
- 0x5b 0x1F 0
+ 0x5b 0x1F 
+ 			: crosshair_1_subpixels
+ 			0x1C 
+ 				: crosshair_1_onaxis
+ 				0 0
 : crosshair_2_data
- 0x22 0x1F 0
+ 0x22 0x1F
+ 			: crosshair_2_subpixels
+ 			0x1D
+ 				: crosshair_2_onaxis
+ 				0 0
 
+
+# These are determined by our current rotation
 : apply_on_axis_main
 	: simple_axis_apply_target_A
 	vF := vF
@@ -335,7 +369,10 @@
 	############ ->>>>>>>>>>>>
 
 	: AxesReturnPoint
+	# Store the final subpixel value into v2:
+	v2 := v1
 
+	# This is going to nuke v0 and v1
 	cross_x := Tx
 	cross_x -= 1
 	cross_y := Ty
@@ -553,6 +590,7 @@ jump SetupOffPosX
 	# if they're literally presenting a 0 degree angle, then, we have no off axis to calculate
 	if work_rot == 0 begin
 		off_axis := 0
+		v1 := 0x80
 		# Obviously, this is already the case:
 		# on_axis := on_axis
 		jump AxesReturnPoint
@@ -560,6 +598,10 @@ jump SetupOffPosX
 
 	if work_rot == 45 begin
 		# This case is a little more complicated, but in essence
+
+		# if we need to remember to set v1 register to subpixels count
+		# then we can do that here:
+		v1 := 0x80
 
 		# What on and off axis are is... vague
 		# But if either axis is less than the other then that's the minimum
@@ -576,23 +618,23 @@ jump SetupOffPosX
 	i := long quick_tan_table
 	:calc offaxis_mem_read { offaxis_mem_read_base + 2 }
 
-	# We could load v1 at this time to obtain subpixels per step if we want it
-
 	i += on_axis
 	i += on_axis
 
 	load v1
 	# v0 will be total off axis displacement
-	# v1 will be the remainder subpixels
+	# v1 will be the remaining subpixels at this point
 
 	WIP_off := v0
 
-	
+
 	if WIP_off > off_axis begin
-		# :breakpoint z
 		# unfortunately, this exceeds our stated maximum
 		# We could raycast however we can also precompute the best result
 		# for every one of these, like we do for the on_axis read
+
+		# if we do this then we lose the knowledge of what our subpixels are
+		# Maybe it's best just to get our subpixels again when we need them?
 
 		WIP_off := off_axis
 		0xF0 00
@@ -645,6 +687,9 @@ jump SetupOffPosX
 	# if __0_, then the correct value is 45 - Tr
 	# if __1_, then Tr can be used to index into the tan table normally
 
+# We save a copy of the normalisd rotation into memory here
+: rotation_normalised
+	0
 # v0 will be a safe copy of TrZ
 # v2 is a copy of the rotation
 : flip_rotation
@@ -652,14 +697,15 @@ jump SetupOffPosX
 	v2 =- v1
 : leave_rotation
 	# At this time v2 now contains our correct rotation value for our tables:
-	
-	# The values are:
-	# v0: A copy of TrZ
-	# v1: ?????
 	# v2: Rotation to use for quick_tan
 
+	# let's save this
+	v0 := v2
+	i := rotation_normalised
+	save v0
+
 	# We need to obtain the memory address of the pregenerated memory from quick_tan
-	i := quick_tan
+	i := long quick_tan
 	# Add rotation, twice:
 	i += v2
 	i += v2
@@ -669,7 +715,6 @@ jump SetupOffPosX
 	i := offaxis_mem_read
 	save v1
 
-	#:breakpoint test
 	i := quick_off_axis
 	i += v2
 	i += v2
@@ -712,7 +757,150 @@ jump SetupOffPosX
 	# Then we must return, and, we jumped here, so
 ;
 
+: trigger_pull
+	# We want to strobe a pixel from crosshair_a to crosshair_b
+	# We know the real positions of these crosshairs in crosshair_1_data
+	# And we know the on and off axis values relative to the player
 
+	v2 := random 0x01
+	if v2 == 0 then	i := address_crosshair_1_data_memory
+	if v2 == 1 then i := address_crosshair_2_data_memory
+	load v1
+	i := pull_trigger_internal_loop
+	save v1
+	if v2 == 0 then	i := apply_on_axis_flipped_memory
+	if v2 == 1 then i := apply_on_axis_main_memory
+	load v1
+	i := pull_trigger_internal_loop_apply_memory
+	save v1
+
+	
+	# Load up the on subpixels and onaxis value for crosshair 1
+	i := crosshair_1_subpixels
+	load v1
+
+	# v0 = subpx of crosshair 1
+	# v1 = on axis of crosshai r1
+
+	# We could Copy subpixels into subpixel accumulating register
+	# But we might not be starting from here.
+	# So we don't
+	# v2 := v0
+	# v1 is our current on axis
+
+	# So load up just this value from crosshair 2:
+	i := crosshair_2_onaxis
+	load v0
+	# Add the two onaxis values together
+	v1 += v0
+
+	# Save to a register
+	v6 := v1
+	# And fix the remaining offset:
+	v6 += -1
+
+	# Load up the normalised rotation:
+	i := rotation_normalised
+	load v0
+
+	# Look up the memory location for subpixels per frame:
+	i := tan_table
+	# Step in by rotation
+	i += v0
+	# Load it up
+	load v0
+	# Store it for later!
+	subpx_step := v0
+
+	# Now, since we actually want every pixel between the two locations
+	# It's more code efficient to actually math it out rather than use our tables
+
+	vE := 0
+	
+	i := trigger_quick_mem
+	v0 := v6
+	save v0
+
+		# Our loop here:
+		# v0 = cross_x
+		# v1 = cross_y
+		# v2 = subpixel accumulator
+		# v3 = on_axis
+		# v4 = off_axis
+		# v5 = subpx_step
+		# v6 = distance_countdown
+		# vE = Allows for the delay of frames
+
+	# Draw the line
+	pull_trigger_internal_loop
+	
+	i := trigger_quick_mem
+	load v0
+	# restore how many pixels to draw
+	v6 := v0
+	# Then undraw it:
+	q_delay
+	pull_trigger_internal_loop
+
+	jump trigger_return
+	
+: trigger_quick_mem
+ 0 0
+
+
+
+: pull_trigger_internal_loop	# This label is used to change
+		# Plot to the starting point:						|
+		i := crosshair_2_data	# <-------------------------- this command
+		load v2
+		cross_x += 1
+		cross_y += 1
+
+		# We know that v2 contains the subpixels achieved by the line when it hit the barrier
+		# But we are going to be counting backwards
+		# So let's just invert this value and call it good:
+
+		vF := 0xFF
+		v2 ^= vF
+		v2 += 1
+		
+		loop
+			# We can just step on 1 pixel at a time:
+			on_axis := 1
+			off_axis := 0
+			v2 += subpx_step
+			if vf != 0 then off_axis := 1
+			# Easy 45 degree mode:
+			if subpx_step == 0xFF then off_axis := 1
+			
+			# If I wanted to reverse this, I would call the other command
+			# And start at the other coords
+			: pull_trigger_internal_loop_apply_memory
+			apply_on_axis_main
+
+			i := line_v
+			sprite cross_x cross_y 1
+
+			vE += 0b01000000
+			if vE == 0 begin
+				q_delay
+			end
+
+			v6 += -1
+
+			if v6 != 0 then
+		again
+;
+
+: q_delay
+	vf := 1
+: f_delay
+	delay := vf
+	loop
+		vf := delay
+		if vf != 0 then
+	again
+;
 
 # So let's do it with actual code, at run time, because we can!
 : generate_tan_table
@@ -723,6 +911,19 @@ jump SetupOffPosX
 	# But we start with 1 because 0 is... all 0s
 
 	Tr := 1
+
+	# So, this code runs over the whole rotation space and yields the off_axis value for an on_axis displacement
+	# We have a 2nd table, which works in the reverse - the maximum on_axis displacement for a given off_axis (per rotation)
+	# We also want access to the remainder subpixels for a given on axis displacement.
+	# This allows us to pull subpixels per step from tan_table and still know where to start,
+	# when drawing a line, as we define our starting point as a vague point on the line
+	# (to allow for simple player control that feels good)
+	# Either I can work this out on hit, or, I can form a table
+	# This code here is able to generate table 1 and table 3,
+	# but the process of having the correct final result for the subpixels is muddied
+	# You only need this when you try to draw a line, so it's just making the 
+	# hot loop slower to ensure we have these to handy
+	# So, how can we change this code so that it generates the subpixel table separately?
 
 	loop
 		# Pull our incrimental subpixel value for this rotation:
@@ -741,21 +942,25 @@ jump SetupOffPosX
 		:monitor tangen_address_base 8
 
 		# Register set up per pass:
-		v1 := 0x80
+		# Initial sub pixels:
+		v1 := 0x80 
 		v3 := 0
 		# Copy subpixels to another, safe register:
-		v5 := v0 # v5 will be subpix remainder
+		subpx_step := v0 # v5 will be subpix per step
 		v0 := 0  # v0 will be total displacement
 
 		# We will have I pointing at the correct location of this extended tan data
 		# We save the 0 value to prevent complicated maths. Same reason we start with r 0
 
 		loop
-			# Save current data:
+			# We will change this to v1 for a 2nd pass:
+			:next generate_tan_table_value_retain
+			#v0 := v2
+			# Save current data (and step on)
 			save v1
 
 			# Incriment subpixels:
-			v1 += v5
+			v1 += subpx_step
 			# If this overflows, we increase displacement in v0
 			if vf != 0 then v0 += 1
 
@@ -768,16 +973,21 @@ jump SetupOffPosX
 		i := code_tangen_address
 		load v1
 
-		# We now have the memory address of the data for quick_tan_table + r * 128 in our v0 and v1
+		# We now have the memory address of the data for quick_tan_table + r * 64 in our v0 and v1
 		# Turns out we want that in our quicktan table:
-		i := quick_tan
+		: generate_tan_table_lookup_base_address
+		i := long quick_tan
+
+		# Set vD to 180 for subpixel table
+		i += vD
+
 		# Incriment I by 2x Tr
 		i += Tr
 		i += Tr
 		save v1
 		
 		# Then work out the next address:
-		v2 := 0x80
+		v2 := 0x80 # Data is 128 bytes each:
 		v1 += v2
 		if vf != 0 then v0 += 1
 
@@ -793,6 +1003,9 @@ jump SetupOffPosX
 		if Tr != 45 then
 	again
 ;
+
+
+	
 
 : generate_offaxis_max_table
 	# So, we also want a table that allows us to figure out the maximum value 
@@ -815,7 +1028,7 @@ jump SetupOffPosX
 		i := tan_table
 		i += Tr
 		load v0
-		v5 := v0
+		subpx_step := v0
 
 		# v0 as on_axis will be the maximum value that we can count to before we overflow to the next pixel.
 		v0 := 0
@@ -837,7 +1050,7 @@ jump SetupOffPosX
 
 		loop
 			v0 += 1
-			v2 += v5
+			v2 += subpx_step
 			if vF != 0 begin
 				# the current value of on axis is the maximum value for this off axis
 				save v0
@@ -872,12 +1085,340 @@ jump SetupOffPosX
 		save v1
 
 		Tr += 1
+		
+		if Tr == 45 begin
+			# the next memory address is set up correctly
+			i := final_off_axis_save
+			save v1
+			
+			i := quick_off_axis
+			i += Tr
+			i += Tr
+			save v1
+		
+			
+			0xF0 00
+			: final_off_axis_save
+			0 0 
+			
+			v0 := 0
+			v1 := 1
+			v2 := 2
+			
+			save v1
+			
+		end
 
 		if Tr != 45 then
 	again
 	
+	# We also want a 1 pixel deep final value for 45 degrees
+	
+	
 
 ;
+
+: service_enemy
+	# v0 is the current value of frame cycle
+	# which atm is a value of 0b????0000
+
+	# v0 := Current movement type    --------- (gets moved elsewhere)
+	# v1 := Current movement subframe --------- (gets moved elsewhere)
+	# v2 := mob_frame : Current animation Frame
+	# ------------ Easy Save separation
+	# v3 := mob_x : Grid X position
+	# v4 := mob_y : Grid Y position
+	# v5 := mob_type : Type of enemy, useful for working out graphic and movement type
+	# v6 := movement index
+	# v7
+	# v8 
+	# v9 := movement subframe relocate
+	# vA := mob movement type
+	# vB mob_data_spacing
+	# vC mob_draw_y
+	# vD mob_draw_x
+	# vE 
+
+	:breakpoint a
+
+	:alias mob_frame v2
+	:alias mob_x v3
+	:alias mob_y v4
+	# 8 bytes per mob
+	:alias mob_type v5
+	:alias mob_movement_index v6
+
+	:alias mob_movement_type vA
+	:alias mob_movement_subframe v9
+
+	:alias mob_data_spacing vB
+	:alias mob_draw_x vD
+	:alias mob_draw_y vC
+
+	i := frame_cycle_count
+	load v0
+
+	i := enemy_list
+	i += v0
+	# Keep this for a hot minute in case we need it:
+	vE := v0
+	load enemy_data_size
+
+	# This will load our enemy into our registers v0 to v7?
+
+	# If there's no mob here, we skip:
+	if mob_type == -1 then jump create_enemy
+	# We need to get the display position of this mob:
+: enemy_created
+	# Backup our registers
+	i := 0x180
+	save vF
+
+	# Copy our data over to our retaining registers:
+	mob_movement_type := v0
+	mob_movement_subframe := v1
+
+	# Step A: Load up the X/Y coords into mob_x mob_y
+	i := grid_xy
+	i += mob_x
+	load v0
+	mob_draw_x := v0
+
+	i := grid_xy
+	i += mob_y
+	load v0
+	mob_draw_y := v0
+
+	# Translate over to the start of the grid:
+	mob_draw_x += UL_X_plus1
+	mob_draw_y += UL_Y_plus1
+
+	# mob_type is now a 0x8 strided list
+	# load up the sprite spacing for this sprite:
+	# i := mob_spacing
+	# i += mob_type
+	# load v0
+	# mob_data_spacing := v0
+
+	# If the mob frame is 1, then it's the first time it's ever been drawn
+	# In this case we don't need to undraw it:
+	if mob_frame == 1 begin
+		mob_frame := 0
+		mob_movement_subframe := 16
+		jump mob_skip_undraw
+	end
+
+	# Step B: we also need to know if the enemy is currently moving
+
+	load_movement_subdata
+
+	v0 += mob_draw_x
+	v1 += mob_draw_y
+
+	# Point I at the sprite:
+	i := brushable_mobs_a
+	i += mob_type
+	i += mob_frame
+
+	# Undraw the enemy:
+	sprite v0 v1 8
+
+	mob_frame += 0x80
+
+	if mob_frame == 0 then mob_movement_subframe += 2
+	: mob_skip_undraw
+	# Cycle the mob frame
+
+
+	if mob_movement_subframe == 16 begin
+		# We should progress to the next part of their movement at this time
+
+		# We need to apply the kind of movement that we hoped to achieve
+
+		: mob_movement_jumpback
+		# mob movement index is the reference from the start of this mob's movement pattern that we're at
+		i := enemy_behaviors
+		i += mob_movement_index
+		# There are up to 16 kinds of thing that move with this system
+		# Each type of movement has 16 bytes available to it
+
+		# Load 2 bytes associated with movement
+		load v1
+		# Go back to the start
+		if v0 == -1 begin
+			v0 := 0b11110000
+			mob_movement_index &= v0
+			jump mob_movement_jumpback
+		end
+
+		# what are we doing
+		# v0 is our new movement type
+		# v1 is our conditional
+
+		# we need to do some math thinking stuff here
+		# so we're going to need v0 and v1 shipped somewhere else
+		mob_movement_type := v0
+		vE := v1
+		mob_movement_subframe := 0
+
+		load_movement_subdata
+		v0 += mob_x
+		v1 += mob_y
+		address_game_cell
+
+		# v0 : cell data
+		# v1 : cell address
+
+		# Yes we can go here!
+		if v0 != -1 begin
+
+			jump mob_cant_do_it
+		end
+
+		: mob_cant_do_it
+		i := frame_cycle_count
+		load v0
+		i := long game_grid
+		i += v1
+		save v0
+
+		# 0: Progress regardless
+		# 1: Repeat until impossible
+		# 2: Retry until successful
+
+		# let's just assume we're progressing right now...
+		
+		mob_movement_index += 2
+
+		# we need to save the whole enemy in this case
+
+
+		mob_movement_subframe := 0
+	end
+
+	load_movement_subdata
+	# Re index to sprite frame:
+
+	v0 += mob_draw_x
+	v1 += mob_draw_y
+
+	i := brushable_mobs_a
+	i += mob_type
+	i += mob_frame
+
+	sprite v0 v1 8
+
+	i := frame_cycle_count
+	load v0
+
+	i := enemy_list
+	i += v0
+
+	v0 := mob_movement_type
+	v1 := mob_movement_subframe
+
+	#save enemy_data_simple_save
+	save enemy_data_size
+
+	i := 0x180
+	load vF
+;
+
+: load_movement_subdata
+	v0 := 0
+	v1 := 0
+
+	if mob_movement_type == 0 then return
+	# movement patterns are strided by 8 pairs of bytes
+	i := movement_patterns
+	# we should store the direct access value in this register:
+	i += mob_movement_type
+	i += mob_movement_subframe
+	# load the two small offsets
+	load v1
+;
+
+
+: create_enemy
+	# vF contains the current enemy slot that is empty
+	# I guess I should load an enemy from our hypothetical list of enemies:
+
+	v2 := 8
+
+	# enemy type is a multiple of 8
+	v3 := v2
+	# v3 will be the mob_movement_index, which is multiples of 16
+	v3 += v3
+	# It also is where the current movement step is stored so it has to exist
+
+	# I guess maybe we have to loop this till we find an empty space?
+	# Note that this should be a multiple of 16 in order to work
+	i := random_mob_position
+	load v0
+	v0 += 2
+	if v0 == 200 then v0 := 0
+	i := random_mob_position
+	save v0
+	i += v0
+	load v1
+	# next X Y coords loaded into v0 v1
+	# Set the enemy to these coords
+
+	i := enemy_template_save_target
+	save v3
+
+	i := enemy_template
+	load v7
+
+	i := enemy_list
+	i += vE
+	save v7
+	# We can now relocate enemy_template v7 to the new memory location
+
+	jump enemy_created
+;
+
+: address_game_cell
+	# v0 := X pos
+	# v1 := Y pos
+	if v0 == 255 then jump bad_coord
+	if v0 == 7 then jump bad_coord
+	if v1 == 255 then jump bad_coord
+	if v1 == 7 then jump bad_coord
+
+	i := long game_grid_stride
+	i += v0
+	load v0
+	v1 += v0
+	i := long game_grid
+	i += v1
+	load v0
+;
+: bad_coord
+	v0 := -2
+	# v0 now has the value of this cell in it
+	# v1 now has the relative index to this cell in it
+;
+
+:calc FREE { 4096 - HERE }
+: FREE_CODE_BYTES
+:byte { FREE >> 8 }
+:byte { FREE }
+:monitor FREE_CODE_BYTES "%2i"
+
+
+# Ironically it's much easier for us to define vertical columns in memory
+: game_grid_stride
+0 7 14 21 28 35 42
+
+: game_grid
+-1 -1 -1 -1 -1 -1 -1
+-1 -1 -1 -1 -1 -1 -1
+-1 -1 -1 -1 -1 -1 -1
+-1 -1 -1 -1 -1 -1 -1
+-1 -1 -1 -1 -1 -1 -1
+-1 -1 -1 -1 -1 -1 -1
+-1 -1 -1 -1 -1 -1 -1
 
 # Ideally these will live in low memory
 : crosshair_a
@@ -936,6 +1477,203 @@ cross_x += off_axis
 : line_v
 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80
 
+:macro fast_mob X { :byte { X * 8 } }
+
+: mob_spacing
+: grid_xy
+0x00 0x08 0x10 0x18 0x20 0x28 0x30 0x38
+0x40 0x48 0x50 0x58 0x60 0x68 0x70 0x78
+
+# 4x32 bytes = 128 bytes
+: brushable_mobs_a
+0x00 0x3C 0x70 0xB0 0x18 0x18 0x18 0x7E 0x00 0x00 0x1C 0x3E 0x2A 0x3E 0x3E 0x3E
+0x00 0x2C 0x7E 0x6A 0x3C 0x7E 0x5A 0x00 0x00 0x00 0x00 0x0C 0x04 0x0C 0x1E 0x3E
+0x00 0x00 0x00 0x3E 0x6B 0x7F 0x3E 0x3E 0x00 0x42 0x66 0x3C 0x18 0x00 0x00 0x00
+0x00 0x00 0x00 0x10 0x38 0x3D 0x1E 0x7E 0x00 0x00 0x00 0x00 0xFC 0x56 0x7E 0x1F
+0x00 0x28 0xFE 0x7C 0xD6 0x7C 0x28 0x00 0x3C 0xFF 0x7E 0xEB 0xAA 0xAA 0x6A 0x3C
+0x00 0x3E 0x2A 0x3E 0x10 0x10 0x38 0x7E 0x33 0x3F 0x7F 0xFF 0xC9 0xFF 0x3F 0x0E
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+: brushable_mobs_b
+0x00 0x3C 0x0E 0x0D 0x18 0x18 0x18 0x7E 0x00 0x1C 0x3E 0x2A 0x3E 0x22 0x22 0x3E
+0x00 0x5A 0x3E 0x54 0x7E 0x3E 0x6C 0x00 0x00 0x00 0x0C 0x14 0x04 0x0E 0x1E 0x1E
+0x00 0x00 0x63 0x7F 0x2A 0x3E 0x3E 0x1C 0x00 0x00 0x00 0xC3 0x7E 0x18 0x00 0x00
+0x00 0x00 0x00 0x20 0x70 0x75 0x3E 0xFE 0x00 0x00 0x00 0x00 0x3E 0x6B 0xFE 0x7C
+0x00 0x28 0xFE 0x7C 0xD6 0x7C 0x44 0x00 0x18 0x7E 0x7E 0x3E 0x56 0x56 0x56 0x3C
+0x00 0x7C 0x54 0x7C 0x08 0x08 0x1C 0x7E 0x76 0x7E 0xFF 0xFF 0x49 0x7F 0x7E 0x38
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+:macro enemy_framework X Y T { 16 0 1 X Y T 
+		:byte { T * 16 } 
+		0 }
+
+: enemy_template
+16 0 1 
+	   : enemy_template_save_target
+	   0 0 0 0 
+	   		   0
+
+:monitor enemy_template 8
+
+: enemy_list
+enemy_framework 1 5 -1
+enemy_framework 1 1 -1
+enemy_framework 2 1 -1
+enemy_framework 3 1 -1
+enemy_framework 1 2 -1
+enemy_framework 2 2 -1
+enemy_framework 3 2 -1
+enemy_framework 1 3 -1
+
+
+	: test_enemy
+	# Imagine an enemy:
+	# We can definitely go to 8
+#   0 1   2   3 4 5   6 7 8
+#   Move type
+	# move frame
+	0 0 # F
+		  1 # X Y T
+		      2 2 0
+		      	  # M N
+		      	    0 0
+
+# These are the enemy behavior types that exist
+# Each behavior is ?? bytes. Maybe 8
+
+# We also have conditionals
+# 0: Progress regardless
+# 1: Repeat until impossible
+# 2: Retry until successful
+
+
+: enemy_behaviors
+# 0 Wiggler
+# Movement Pattern
+	# Move sideways one step, then move the other way one subpx_step
+	16 0 48 0 	-1 0 0 0 	0 0 0 0  0 0 0 0 
+# 1 Chompo
+	# move down, wait, move up, wait
+	2 0 0 0 	4 0 0 0 	-1 0 0 0 0 0 0 0
+# 2 Skulkulon
+	1 1 3 1		-1 0 0 0	0 0 0 0	 0 0 0 0
+# 3 Snaker
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 4 Angero
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 5 Batato
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 6 Sneil
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 7 Limbox
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 8 Pincing
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 9 Borkus
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 10 Neck King
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# 11 Blurbinger
+	# Legit just does nothing
+	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+
+# Empty Space:
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+
+	
+
+
+:const movement_length 16
+
+# it's me! Using macros! Hooray!
+:macro mpat_s X Y A {
+	:byte { X * A }
+	:byte { Y * A }
+}
+:macro mpat_8 X Y { 
+ 	mpat_s X Y 1
+ 	mpat_s X Y 2
+ 	mpat_s X Y 3
+ 	mpat_s X Y 4
+ 	mpat_s X Y 5
+ 	mpat_s X Y 6
+ 	mpat_s X Y 7
+ 	mpat_s X Y 8
+}
+
+# These will generate eg 1 2 3 4 5 6 7 8 X Y coords for how to move an object per frame
+: movement_patterns
+# 0
+mpat_8  0  0
+
+# 1
+mpat_8  1  0
+# 2
+mpat_8  0  1
+# 3
+mpat_8 -1  0
+# 4
+mpat_8  0 -1
+
+# 5
+mpat_8  1  1
+# 6
+mpat_8 -1  1
+# 7
+mpat_8 -1 -1
+# 8
+mpat_8  1 -1
+
+
+: random_mob_position
+	0
+	2 1	3 4	1 5	1 4
+	4 4	1 3	3 3	4 2
+	2 3	1 2	5 3	1 1
+	3 2	3 5	4 3	5 5
+	4 5	5 2	3 1	4 1
+	2 4	2 2	5 4	2 5
+	5 1	5 5	5 3	1 1
+	3 4	2 2	5 1	3 2
+	4 2	1 4	2 4	2 1
+	2 5	1 2	4 1	4 5
+	4 3	5 4	1 3	4 4
+	5 2	3 3	2 3	1 5
+	3 1	3 5	3 2	4 2
+	4 5	2 4	4 4	5 5
+	5 3	4 1	3 5	2 5
+	2 2	1 1	3 1	1 3
+	1 2	5 2	1 5	3 4
+	2 3	5 4	2 1	3 3
+	5 1	4 3	1 4	2 4
+	3 5	2 1	5 1	2 2
+	5 4	1 1	3 2	3 4
+	5 5	1 3	1 2	1 5
+	2 5	4 1	4 5	1 4
+	4 2	3 3	5 3	4 4
+	3 1	5 2	2 3	4 3
+
 ##################################
 
 # Yeah ok, so I wanted to try and use macros and calc to work out things.
@@ -954,13 +1692,13 @@ cross_x += off_axis
 #: tan_table
 #	do-45 tan-entry
 
-: tan_table # 45 bytes that represent subpixels on the offaxis when incrimenting adjacent by 1
+: tan_table # 46 bytes that represent subpixels on the offaxis when incrimenting adjacent by 1
  0x00 0x04 0x08 0x0D 0x11 0x16 0x1A 0x1F 
  0x23 0x28 0x2D 0x31 0x36 0x3B 0x3F 0x44 
  0x49 0x4E 0x53 0x58 0x5D 0x62 0x67 0x6C 
  0x71 0x77 0x7C 0x82 0x88 0x8D 0x93 0x99 
  0x9F 0xA6 0xAC 0xB3 0xB9 0xC0 0xC8 0xCF 
- 0xD6 0xDE 0xE6 0xEE 0xF7
+ 0xD6 0xDE 0xE6 0xEE 0xF7 0xFF 
 
 : quick_tan # This will be 90 bytes of address information that will correspond with the memory address of 
 			# saved off axis positions and subpixels for all rotations from 0 to 45
@@ -973,25 +1711,32 @@ cross_x += off_axis
  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 64
  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 # 90
 
- : quick_off_axis
+# Yep you guessed it:
+: quick_sub
  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 32
  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 64
  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 # 90
 
-
+ : quick_off_axis
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 32
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 # 64
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 # 90
+ # And then two more, for 45
+ 0 0
 
 : register_dump
  0 0 0 0 0 0 0 0 
  0 0 0 0 0 0 0 0 
 
 :monitor register_dump 16
-
+:monitor game_grid 49
 
 
 : quick_tan_table
  	# This will be a ~ 5kb data structure of all our data
 
 :calc probably_offaxis_data { quick_tan_table + 44 * 128 }
-#:monitor probably_offaxis_data 128
+:monitor probably_offaxis_data 128
 #:monitor quick_off_axis 90
 
+:monitor crosshair_1_data 10
