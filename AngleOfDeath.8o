@@ -1177,19 +1177,7 @@ jump SetupOffPosX
 	mob_movement_subframe := v1
 
 	# Step A: Load up the X/Y coords into mob_x mob_y
-	i := grid_xy
-	i += mob_x
-	load v0
-	mob_draw_x := v0
-
-	i := grid_xy
-	i += mob_y
-	load v0
-	mob_draw_y := v0
-
-	# Translate over to the start of the grid:
-	mob_draw_x += UL_X_plus1
-	mob_draw_y += UL_Y_plus1
+	calc_mob_draw_xy
 
 	# mob_type is now a 0x8 strided list
 	# load up the sprite spacing for this sprite:
@@ -1224,11 +1212,37 @@ jump SetupOffPosX
 	mob_frame += 0x80
 
 	if mob_frame == 0 then mob_movement_subframe += 2
-	: mob_skip_undraw
+	
 	# Cycle the mob frame
 
 
 	if mob_movement_subframe == 16 begin
+		# We have completed our movement.
+		# We marked our new cell as ours when we started moving.
+		# So we must clear our current cell:
+
+		# If it's a type of movement that actually moves:
+		if mob_movement_type != 0 begin
+			v0 := mob_x
+			v1 := mob_y
+			address_game_cell
+			i := game_grid
+			i += v1
+			v0 := -1
+			save v0
+			
+			# Get single digit translation:
+			mob_movement_subframe := 0
+			load_movement_subdata
+			mob_x += v0
+			mob_y += v1
+			# New position marked
+
+			calc_mob_draw_xy
+		end
+
+		: mob_skip_undraw
+
 		# We should progress to the next part of their movement at this time
 
 		# We need to apply the kind of movement that we hoped to achieve
@@ -1238,17 +1252,21 @@ jump SetupOffPosX
 		i += mob_movement_index
 		# There are up to 16 kinds of thing that move with this system
 		# Each type of movement has 16 bytes available to it
-
 		# Load 2 bytes associated with movement
 		load v1
+
+		# If we've reached the end:
 		# Go back to the start
+		# This sets v0 % 16 to 0
+		# Don't have a good way to detect hitting the full 16 tho.
+		# Seems like a huge pita to do this properly:
 		if v0 == -1 begin
 			v0 := 0b11110000
 			mob_movement_index &= v0
 			jump mob_movement_jumpback
 		end
 
-		# what are we doing
+		# We just loaded from memory
 		# v0 is our new movement type
 		# v1 is our conditional
 
@@ -1256,8 +1274,12 @@ jump SetupOffPosX
 		# so we're going to need v0 and v1 shipped somewhere else
 		mob_movement_type := v0
 		vE := v1
-		mob_movement_subframe := 0
 
+		# A non 0 movement type is obviously acceptable:
+		if mob_movement_type == 0 then jump movement_auto_valid
+
+		# we need to look up the cell associated with this new position:
+		mob_movement_subframe := 0
 		load_movement_subdata
 		v0 += mob_x
 		v1 += mob_y
@@ -1266,29 +1288,56 @@ jump SetupOffPosX
 		# v0 : cell data
 		# v1 : cell address
 
-		# Yes we can go here!
-		if v0 != -1 begin
+		# If v0 is -1, then it's fine
 
-			jump mob_cant_do_it
+		# if v0 is NOT -1, then, we can't move right now
+		if v0 != -1 begin
+			# What we do now depends on the value of vE
+			# Progression rules:
+			# We also have conditionals
+			# 0: Progress regardless
+			# 1: Repeat until impossible
+			# 2: Retry until successful
+
+			# Progress anyway
+			if vE == 0 begin
+				# Just defer movement type to 0:
+				mob_movement_type := 0
+				mob_movement_index += 2
+			end
+
+			# This movement is impossible, so we should actually progress to the next movement
+			if vE == 1 begin
+				# We want to progress on a step:
+				mob_movement_index += 2
+				jump mob_movement_jumpback
+			end
+
+			if vE == 2 begin
+				# We want to do nothing for this frame, but not progress:
+				mob_movement_type := 0
+			end
+
 		end
 
-		: mob_cant_do_it
-		i := frame_cycle_count
-		load v0
-		i := long game_grid
-		i += v1
-		save v0
+		if v0 == -1 begin
+			# Load up this enemy ID:
+			i := frame_cycle_count
+			load v0
+			# Target the game_grid and save our ID into it:
+			i := long game_grid
+			i += v1
+			save v0
 
-		# 0: Progress regardless
-		# 1: Repeat until impossible
-		# 2: Retry until successful
-
-		# let's just assume we're progressing right now...
-		
-		mob_movement_index += 2
+			: movement_auto_valid
+			# If we can move into this location
+			# Then v1 = 0 == progress
+			#      v1 = 1 == don't progress yet
+			#      v1 = 2 == progress
+			if vE != 1 then mob_movement_index += 2
+		end
 
 		# we need to save the whole enemy in this case
-
 
 		mob_movement_subframe := 0
 	end
@@ -1321,6 +1370,22 @@ jump SetupOffPosX
 	load vF
 ;
 
+: calc_mob_draw_xy
+	i := grid_xy
+	i += mob_x
+	load v0
+	mob_draw_x := v0
+
+	i := grid_xy
+	i += mob_y
+	load v0
+	mob_draw_y := v0
+
+	# Translate over to the start of the grid:
+	mob_draw_x += UL_X_plus1
+	mob_draw_y += UL_Y_plus1
+;
+
 : load_movement_subdata
 	v0 := 0
 	v1 := 0
@@ -1347,6 +1412,9 @@ jump SetupOffPosX
 
 	v0 += 8
 	if v0 == 24 then v0 := 0
+
+	vF := random 0b00001111
+	if vF != 0 then return
 
 	i := last_enemy
 	save v0
