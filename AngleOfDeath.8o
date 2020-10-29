@@ -296,7 +296,7 @@
 
 		: trigger_return
 
-		vf := 2
+		vf := 1
 		f_delay
 
 		i := long register_dump
@@ -1130,8 +1130,9 @@ jump SetupOffPosX
 	# v4 := mob_y : Grid Y position
 	# v5 := mob_type : Type of enemy, useful for working out graphic and movement type
 	# v6 := movement index
-	# v7
-	# v8 
+	# v7 := 
+	# ------------------
+	# v8 := infinite loop protection when deciding next movement type
 	# v9 := movement subframe relocate
 	# vA := mob movement type
 	# vB mob_data_spacing
@@ -1145,7 +1146,9 @@ jump SetupOffPosX
 	# 8 bytes per mob
 	:alias mob_type v5
 	:alias mob_movement_index v6
+	:alias mob_speeder v7
 
+	:alias mob_infinite_loop_protection v8
 	:alias mob_movement_type vA
 	:alias mob_movement_subframe v9
 
@@ -1165,7 +1168,7 @@ jump SetupOffPosX
 	# This will load our enemy into our registers v0 to v7?
 
 	# If there's no mob here, we skip:
-	if mob_type == -1 then jump create_enemy
+	if mob_type == -1 then jump maybe_create_enemy
 	# We need to get the display position of this mob:
 : enemy_created
 	# Backup our registers
@@ -1186,18 +1189,19 @@ jump SetupOffPosX
 	# load v0
 	# mob_data_spacing := v0
 
-	# If the mob frame is 1, then it's the first time it's ever been drawn
+	# If the mob frame is -1, then it's the first time it's ever been drawn
 	# In this case we don't need to undraw it:
-	if mob_frame == 1 begin
+	if mob_frame == -1 begin
 		mob_frame := 0
 		mob_movement_subframe := 16
 		jump mob_skip_undraw
 	end
 
-	# Step B: we also need to know if the enemy is currently moving
-
+	# Step B: we also need to know the enemy's last displacement:
+	# This uses movement_type and movement_subframe to load up the offsets
+	# into v0 and v1
+	# then we add in the base draw position of this enemy:
 	load_movement_subdata
-
 	v0 += mob_draw_x
 	v1 += mob_draw_y
 
@@ -1209,9 +1213,26 @@ jump SetupOffPosX
 	# Undraw the enemy:
 	sprite v0 v1 8
 
+	# Iterate the frame every time we process this enemy, so that
+	# it always does a little dance
+	# conviniently, the sprites are strided by 0x80
 	mob_frame += 0x80
 
-	if mob_frame == 0 then mob_movement_subframe += 2
+	# And move it only half the time.
+	# it would be cool if we could make some mobs move faster or slower:
+
+	mob_speeder -= 1
+
+	:const mob_speed_offset 0
+
+	if mob_speeder == 0 begin
+		i := long default_mob_datas
+		i += mob_type
+		v0 := mob_speed_offset
+		load v0
+		mob_speeder := v0
+		mob_movement_subframe += 2
+	end
 	
 	# Cycle the mob frame
 
@@ -1242,13 +1263,19 @@ jump SetupOffPosX
 		end
 
 		: mob_skip_undraw
-
 		# We should progress to the next part of their movement at this time
 
+		mob_infinite_loop_protection := 0
 		# We need to apply the kind of movement that we hoped to achieve
 		: mob_movement_jumpback
+		mob_infinite_loop_protection += 1
+		if mob_infinite_loop_protection == 6 then jump mob_loop_fail
+		# We need to defend against infinite loops at this time
+		if mob_movement_index == 16 then mob_movement_index := 0
 		# mob movement index is the reference from the start of this mob's movement pattern that we're at
 		i := enemy_behaviors
+		i += mob_type
+		i += mob_type
 		i += mob_movement_index
 		# There are up to 16 kinds of thing that move with this system
 		# Each type of movement has 16 bytes available to it
@@ -1257,12 +1284,8 @@ jump SetupOffPosX
 
 		# If we've reached the end:
 		# Go back to the start
-		# This sets v0 % 16 to 0
-		# Don't have a good way to detect hitting the full 16 tho.
-		# Seems like a huge pita to do this properly:
 		if v0 == -1 begin
-			v0 := 0b11110000
-			mob_movement_index &= v0
+			mob_movement_index := 0
 			jump mob_movement_jumpback
 		end
 
@@ -1274,6 +1297,11 @@ jump SetupOffPosX
 		# so we're going to need v0 and v1 shipped somewhere else
 		mob_movement_type := v0
 		vE := v1
+
+		if mob_movement_type == -2 begin
+			mob_movement_type := random 0b00110000
+			mob_movement_type += 16
+		end
 
 		# A non 0 movement type is obviously acceptable:
 		if mob_movement_type == 0 then jump movement_auto_valid
@@ -1302,6 +1330,9 @@ jump SetupOffPosX
 			# Progress anyway
 			if vE == 0 begin
 				# Just defer movement type to 0:
+				: mob_loop_fail
+				# This prevents us from experiencing another result:
+				vE := 0
 				mob_movement_type := 0
 				mob_movement_index += 2
 			end
@@ -1310,14 +1341,17 @@ jump SetupOffPosX
 			if vE == 1 begin
 				# We want to progress on a step:
 				mob_movement_index += 2
+				# This can create an infinite loop if the enemy is unable to progress in any direction:
 				jump mob_movement_jumpback
 			end
 
 			if vE == 2 begin
 				# We want to do nothing for this frame, but not progress:
 				mob_movement_type := 0
+				# If we can't move because it's a bad coord, we'll never succeed!!
+				# So progress anyway:
+				if v0 == -2 then mob_movement_index += 2
 			end
-
 		end
 
 		if v0 == -1 begin
@@ -1403,7 +1437,7 @@ jump SetupOffPosX
 : last_enemy
  0
 
-: create_enemy
+: maybe_create_enemy
 	# vF contains the current enemy slot that is empty
 	# I guess I should load an enemy from our hypothetical list of enemies:
 
@@ -1411,7 +1445,7 @@ jump SetupOffPosX
 	load v0
 
 	v0 += 8
-	if v0 == 24 then v0 := 0
+	if v0 == 96 then v0 := 0
 
 	vF := random 0b00001111
 	if vF != 0 then return
@@ -1422,9 +1456,7 @@ jump SetupOffPosX
 	v2 := v0
 
 	# enemy type is a multiple of 8
-	v3 := v2
-	# v3 will be the mob_movement_index, which is multiples of 16
-	v3 += v3
+	v3 := 0
 	# It also is where the current movement step is stored so it has to exist
 
 	# I guess maybe we have to loop this till we find an empty space?
@@ -1599,10 +1631,10 @@ cross_x += off_axis
 		0 }
 
 : enemy_template
-16 0 1 
+16 0 -1 
 	   : enemy_template_save_target
 	   0 0 0 0 
-	   		   0
+	   		   1
 
 :monitor enemy_template 8
 
@@ -1647,42 +1679,43 @@ enemy_framework 1 3 -1
 	# move down, wait, move up, wait
 	32 0 0 0 	64 0 0 0 	-1 0 0 0 0 0 0 0
 # 2 Skulkulon
+	# Move one way, then the other
 	16 1 48 1	-1 0 0 0	0 0 0 0	 0 0 0 0
 # 3 Snaker
 	# Legit just does nothing
 	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
 
 # 4 Angero
-	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	# T shape
+	16 0 64 0	32 0 16 0	48 0 64 0  32 0 48 0
 
 # 5 Batato
-	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	# Moves randomly then stops then random again
+	-2 0 0 0	-1 0 0 0		0 0 0 0	 0 0 0 0
 
 # 6 Sneil
-	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	# Occasionally moves sideways
+	0 0 0 0	   16 0 0 0		0 0 0 0	 48 0 0 0
 
 # 7 Limbox
-	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	# Diagnoals
+	0x50 1 0x60 1	0x70 1 0x80 1		-1 0 0 0	 0 0 0 0
 
 # 8 Pincing
-	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	# Sneaks down then swoops back up
+	32 0 0 0	32 0 0 0		32 0 64 2	 64 2 64 2
 
 # 9 Borkus
-	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	# Fully Random All the time
+	-2 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
 
 # 10 Neck King
-	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	# Moves up then moves down
+	64 1 32 1	-1 0 0 0		0 0 0 0	 0 0 0 0
 
 # 11 Blurbinger
 	# Legit just does nothing
-	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
+	0x50 2 64 2	0x60 2 64 2		-1 0 0 0	 0 0 0 0
 
 # Empty Space:
 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -1690,6 +1723,35 @@ enemy_framework 1 3 -1
 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 
+: default_mob_datas
+# 0 Wiggler
+	2 0 0 0 0 0 0 0
+# 1 Chompo
+	2 0 0 0 0 0 0 0
+# 2 Skulkulon
+	2 0 0 0 0 0 0 0
+# 3 Snaker
+	2 0 0 0 0 0 0 0
+# 4 Angero
+	4 0 0 0 0 0 0 0
+# 5 Batato
+	2 0 0 0 0 0 0 0
+# 6 Sneil
+	4 0 0 0 0 0 0 0
+# 7 Limbox
+	2 0 0 0 0 0 0 0
+# 8 Pincing
+	1 0 0 0 0 0 0 0
+# 9 Borkus
+	2 0 0 0 0 0 0 0
+# 10 Neck King
+	2 0 0 0 0 0 0 0
+# 11 Blurbinger
+	3 0 0 0 0 0 0 0
+	2 0 0 0 0 0 0 0
+	2 0 0 0 0 0 0 0
+	2 0 0 0 0 0 0 0
+	2 0 0 0 0 0 0 0
 	
 
 
@@ -1762,6 +1824,7 @@ mpat_8  1 -1
 	2 5	4 1	4 5	1 4
 	4 2	3 3	5 3	4 4
 	3 1	5 2	2 3	4 3
+
 
 ##################################
 
