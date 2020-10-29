@@ -1232,7 +1232,6 @@ jump SetupOffPosX
 		# We should progress to the next part of their movement at this time
 
 		# We need to apply the kind of movement that we hoped to achieve
-
 		: mob_movement_jumpback
 		# mob movement index is the reference from the start of this mob's movement pattern that we're at
 		i := enemy_behaviors
@@ -1336,12 +1335,23 @@ jump SetupOffPosX
 	load v1
 ;
 
+: last_enemy
+ 0
 
 : create_enemy
 	# vF contains the current enemy slot that is empty
 	# I guess I should load an enemy from our hypothetical list of enemies:
 
-	v2 := 8
+	i := last_enemy
+	load v0
+
+	v0 += 8
+	if v0 == 24 then v0 := 0
+
+	i := last_enemy
+	save v0
+
+	v2 := v0
 
 	# enemy type is a multiple of 8
 	v3 := v2
@@ -1567,9 +1577,9 @@ enemy_framework 1 3 -1
 	16 0 48 0 	-1 0 0 0 	0 0 0 0  0 0 0 0 
 # 1 Chompo
 	# move down, wait, move up, wait
-	2 0 0 0 	4 0 0 0 	-1 0 0 0 0 0 0 0
+	32 0 0 0 	64 0 0 0 	-1 0 0 0 0 0 0 0
 # 2 Skulkulon
-	1 1 3 1		-1 0 0 0	0 0 0 0	 0 0 0 0
+	16 1 48 1	-1 0 0 0	0 0 0 0	 0 0 0 0
 # 3 Snaker
 	# Legit just does nothing
 	0 0 -1 0	0 0 0 0		0 0 0 0	 0 0 0 0
