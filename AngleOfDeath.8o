@@ -14,7 +14,7 @@
 :alias Tr  vB   # Rotation
 :alias TrZ vA   # Rotation Zone
 :alias frame_stepper v9
-# v8
+:alias next_crosshair v8
 # v7
 
 
@@ -143,6 +143,11 @@
 	v0 := TrZ
 	v2 := Tr
 
+	:macro calc_next_crosshair {
+		next_crosshair := random 0b00000111
+		next_crosshair += 4
+	}
+	calc_next_crosshair
 	jump0 update_rotation_code
 
 	loop
@@ -162,14 +167,6 @@
 		
 		v0 := 0xE if v0 key then jump trigger_pull
 
-		v0 := 1  if v0 key then jump cross_a
-		v0 := 2  if v0 key then jump cross_b
-		v0 := 3  if v0 key then jump cross_c
-		v0 := 0xC if v0 key then jump cross_d
-
-		v0 := 0xA if v0 key then jump cross_edit_1
-		v0 := 0xB if v0 key then jump cross_edit_2
-
 		: cross_return
 
 		detect_rot := Tx
@@ -184,14 +181,6 @@
 
 		# We only have to run this code if they push a button:
 		if player_input == 0 then jump service_rot
-
-		# Gate player until we have a better option:
-		if Tx == UL_X then jump backtrack_right # ie, go right
-		if Tx == UR_X then jump backtrack_left
-		: backtrack_lr_return
-		if Ty == UL_Y then jump backtrack_down
-		if Ty == LL_Y then jump backtrack_up
-		: backtrack_ud_return
 
 		# We will use v5 to indicate we're trying to change rotation:
 
@@ -306,49 +295,35 @@
 
 		: trigger_return
 
-		i := cross_option
-		load v0
-		v2 := v0
 
-		i := long use_crosshair
+		if next_crosshair == 1 then jump draw_player_crosshair
 
-		v0 := Tx
-		v1 := Ty
+		if next_crosshair == 0 begin
+			: draw_player_crosshair
+			# Draw crosshair
+			i := long player_crosshair
+			v0 := Tx
+			v1 := Ty
+			v0 -= 3
+			v1 -= 3
 
-		v0 -= 3
-		v1 -= 3
-
-		if v2 == 3 then jump do_jiggle
-
-		if v2 == 1 begin
-			: do_jiggle
-
-			v3 := random 0b00000011
-			if v3 == 0 then v0 += -1
-			if v3 == 3 then v0 += 1
-
-			v3 := random 0b00000011
-			if v3 == 0 then v1 += -1
-			if v3 == 3 then v1 += 1
+			sprite v0 v1 8
 		end
 
-		if v2 == 3 then jump do_flicker
-		if v2 == 2 begin
-			: do_flicker
+		
 
-
-			v3 := random 0b00000011
-			if v3 != 0 begin
-				i := long p_crosshair_none
-			end
-		end
-
-		sprite v0 v1 8
 
 		vf := 1
 		f_delay
 
-		sprite v0 v1 8
+		if next_crosshair == 1 then jump undraw_player_crosshair
+		if next_crosshair == 0 begin
+			calc_next_crosshair
+			: undraw_player_crosshair
+			# Undraw crosshair
+			sprite v0 v1 8
+		end
+		next_crosshair += -1
 
 		i := long register_dump
 		save vF
@@ -429,78 +404,6 @@
 	cross_y := Ty
 	cross_y -= 1
 ;
-
-
-
-: backtrack_right
-	# Player is trying to move into left wall, we want to backtrack them up the line, if we can
-	# Fix Tx
-	backtrack_unified
-	if v2 == 1 then Tx += 1
-	jump backtrack_lr_return	
-: backtrack_left
-	backtrack_unified
-	if v2 == 1 then Tx -= 1
-	jump backtrack_lr_return
-: backtrack_up
-	backtrack_unified
-	if v2 == 1 then Ty -= 1
-	jump backtrack_ud_return
-: backtrack_down
-	backtrack_unified
-	if v2 == 1 then Ty += 1
-	jump backtrack_ud_return
-
-: backtrack_unified
-	set_i_to_offaxis
-	off_axis := 1
-	i += off_axis
-
-	# Load the on_axis value that corresponds with 1 px off axis
-	load v0
-
-	# We can figure out 
-	on_axis := v0
-
-	v2 := 1
-
-	cross_x := Tx
-	cross_y := Ty
-
-	apply_on_axis_main
-
-	# Is this result better for us? We actually don't know right now what
-	# direction is beneficial so we kind of have to check all of them
-	# but this code does only trigger when the player is trying to move into a wall
-
-	check_backtrack_result
-
-	if v2 == 0 then return
-
-	cross_x := Tx
-	cross_y := Ty
-
-	apply_on_axis_flipped
-
-	check_backtrack_result
-;
-
-
-: check_backtrack_result
-	if v0 <= UL_X then jump backtrack_bad_result
-	if v0 >= UR_X then jump backtrack_bad_result
-	if v1 <= UL_Y then jump backtrack_bad_result
-	if v1 >= LL_Y then jump backtrack_bad_result
-
-	Tx := v0
-	Ty := v1
-
-	v2 := 0
-
-	: backtrack_bad_result
-;
-
-
 
 : SetupOnAxis
 # 0000 # On axis: +X, off axis -Y
@@ -1572,46 +1475,6 @@ jump SetupOffPosX
 	# v1 now has the relative index to this cell in it
 ;
 
-: cross_a
-	i := long p_crosshair_a	
-	jump shared_cross
-: cross_b
-	i := long p_crosshair_b
-	jump shared_cross
-: cross_c
-	i := long p_crosshair_c
-	jump shared_cross
-: cross_d
-	i := long p_crosshair_diamond
-: shared_cross
-	load v7
-	i := long use_crosshair
-	save v7
-jump cross_return
-
-: cross_option
-0
-
-: cross_edit_1
-	i := cross_option
-	load v0
-	v1 := 0x1
-	v0 ^= v1
-	i := cross_option
-	save v0
-
-	jump cross_return
-: cross_edit_2
-
-	i := cross_option
-	load v0
-	v1 := 0x2
-	v0 ^= v1
-	i := cross_option
-	save v0
-
-	jump cross_return
-
 
 
 :calc FREE { 4096 - HERE }
@@ -1694,20 +1557,8 @@ cross_x += off_axis
 :macro fast_mob X { :byte { X * 8 } }
 
 
-: p_crosshair_diamond
-0x18 0x24 0x42 0x81 0x81 0x42 0x24 0x18 
-
-: p_crosshair_a
-0x00 0x10 0x10 0x6C 0x10 0x10 0x00 0x00
-
-: p_crosshair_b
-0x00 0x00 0x38 0x28 0x38 0x00 0x00 0x00 
-
-: p_crosshair_c
+: player_crosshair
 0x28 0x00 0x82 0x00 0x82 0x00 0x28 0x00 
-
-: p_crosshair_none
-0 0 0 0 0 0 0 0
 
 
 : use_crosshair
