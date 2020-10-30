@@ -43,6 +43,11 @@
 :calc UR_Max8 { UL_X + zone }
 :calc LL_Max8 { UL_Y_plus1 + zone }
 
+:calc player_LEFT_LIMIT { UL_X + 3 }
+:calc player_RIGHT_LIMIT { UR_X - 3 }
+
+:calc player_TOP_LIMIT { UL_Y + 3 }
+:calc player_LOW_LIMIT { LL_Y - 3 }
 
 #########
 #
@@ -144,7 +149,7 @@
 	v2 := Tr
 
 	:macro calc_next_crosshair {
-		next_crosshair := random 0b00000111
+		next_crosshair := random 0b00001111
 		next_crosshair += 4
 	}
 	calc_next_crosshair
@@ -181,6 +186,12 @@
 
 		# We only have to run this code if they push a button:
 		if player_input == 0 then jump service_rot
+
+		# Gate player
+		if Tx == player_LEFT_LIMIT then Tx += 1 # ie, go right
+		if Tx == player_RIGHT_LIMIT then Tx += -1
+		if Ty == player_TOP_LIMIT then Ty += 1
+		if Ty == player_LOW_LIMIT then Ty += -1
 
 		# We will use v5 to indicate we're trying to change rotation:
 
@@ -241,8 +252,20 @@
 		load v0
 		v0 += 8
 		if v0 == 64 begin
+
+			# calculate small offset to player crosshair
+			i := player_crosshair_adjust
+			v0 := random 0b00000011
+			v0 -= 4
+			if v0 == -1 then v0 := -3
+			v1 := random 0b00000011
+			v1 -= 4
+			if v1 == -1 then v1 := -3
+			save v1
+
 			v0 := 0
 			frame_stepper += 0x80
+
 		end
 		i := frame_cycle_count
 		save v0
@@ -254,6 +277,8 @@
 			draw_crosshairs_from_memory
 			jump bypass_crosshair_update
 		end
+
+		if next_crosshair != 0 then next_crosshair += -1
 
 		############ UPDATE STUFF
 		# Calculate first:
@@ -301,11 +326,15 @@
 		if next_crosshair == 0 begin
 			: draw_player_crosshair
 			# Draw crosshair
+
+			i := player_crosshair_adjust
+			load v1
+
 			i := long player_crosshair
-			v0 := Tx
-			v1 := Ty
-			v0 -= 3
-			v1 -= 3
+			v0 += Tx
+			v1 += Ty
+			#v0 -= 3
+			#v1 -= 3
 
 			sprite v0 v1 8
 		end
@@ -340,6 +369,9 @@
 
 : frame_cycle_count
   0
+
+: player_crosshair_adjust
+ 0 0
 
 
 : draw_crosshairs_from_memory
@@ -771,9 +803,8 @@ jump SetupOffPosX
 
 	vE := 0
 	
-	i := trigger_quick_mem
-	v0 := v6
-	save v0
+	i := 0x180
+	save v6
 
 		# Our loop here:
 		# v0 = cross_x
@@ -788,12 +819,26 @@ jump SetupOffPosX
 	# Draw the line
 	pull_trigger_internal_loop
 	
-	i := trigger_quick_mem
-	load v0
-	# restore how many pixels to draw
-	v6 := v0
-	# Then undraw it:
+	
 	q_delay
+
+	# We have to remove all enemies first and test them individually against the line
+	# Let's scan for all enemies at this time:
+	sweep_enemies
+	
+	# Activate collision detection
+	v5 := 1
+	sweep_enemies
+
+	# turn off collision check and restore any remaining enemies:
+	v5 := 0
+	sweep_enemies
+
+
+	# Then undraw the line:
+	i := 0x180
+	# restore how many pixels to draw
+	load v6
 	pull_trigger_internal_loop
 
 	jump trigger_return
@@ -801,6 +846,40 @@ jump SetupOffPosX
 : trigger_quick_mem
  0 0
 
+: sweep_enemies
+	v6 := 0
+	loop
+		i := long enemy_fast_redraw
+		i += v6
+		load v3
+
+		if v3 == -1 then jump trigger_skip_empty_mob
+		i := long brushable_mobs
+		i += v2
+
+		sprite v0 v1 8
+		# Test vF here perhaps
+		if v5 == 1 begin
+			if vF == 0 begin
+				# This enemy does not collide, so we can remove it from testing:
+				sprite v0 v1 8
+				jump trigger_skip_empty_mob
+			end
+
+			# Otherwise it does collide:
+
+			i := long enemy_fast_redraw
+			v0 := 0
+			v1 := 0
+			v2
+			
+		end
+
+		: trigger_skip_empty_mob
+		v6 += 0x08
+		if v6 != 64 then
+	again
+;
 
 
 : pull_trigger_internal_loop	# This label is used to change
@@ -1134,7 +1213,10 @@ jump SetupOffPosX
 	mob_movement_subframe := v1
 
 	# Step A: Load up the X/Y coords into mob_x mob_y
-	calc_mob_draw_xy
+
+	# Now because we save the enemy position we don't need to do this:
+	# calc_mob_draw_xy
+
 
 	# mob_type is now a 0x8 strided list
 	# load up the sprite spacing for this sprite:
@@ -1155,9 +1237,16 @@ jump SetupOffPosX
 	# This uses movement_type and movement_subframe to load up the offsets
 	# into v0 and v1
 	# then we add in the base draw position of this enemy:
-	load_movement_subdata
-	v0 += mob_draw_x
-	v1 += mob_draw_y
+
+	# We can do this:
+	#load_movement_subdata
+	#v0 += mob_draw_x
+	#v1 += mob_draw_y
+	# But instead we can do this:
+	i := long enemy_fast_redraw
+	i += vE
+	load v1
+	# We could load v2 and get the below offset, but we already have it:
 
 	# Point I at the sprite:
 	i := brushable_mobs
@@ -1208,12 +1297,12 @@ jump SetupOffPosX
 			
 			# Get single digit translation:
 			mob_movement_subframe := 0
+			# We pick the subframe assoicated with 1 px offset
+			# But instead apply that to the grid:
 			load_movement_subdata
 			mob_x += v0
 			mob_y += v1
 			# New position marked
-
-			calc_mob_draw_xy
 		end
 
 		: mob_skip_undraw
@@ -1330,33 +1419,64 @@ jump SetupOffPosX
 		mob_movement_subframe := 0
 	end
 
+	calc_mob_draw_xy
 	load_movement_subdata
 	# Re index to sprite frame:
 
 	v0 += mob_draw_x
 	v1 += mob_draw_y
 
-	i := brushable_mobs
+	# Take a copy of exactly where we drew this enemy on the screen:
+	i := temp_e_data_b
+	save v1
+
+	i := long brushable_mobs
 	i += mob_type
 	i += mob_frame
 
+	# This is the exact position of where the mob is drawn
 	sprite v0 v1 8
+
+	# Right now, v0 and v1 contain the information I want about the sprite position
+	# mob_type + mob_frame consitute a < 256 byte offset to the graphic
 
 	i := frame_cycle_count
 	load v0
-
 	i := enemy_list
 	i += v0
 
+	# Keep the offset somewhere
+	vE := v0
+
+	# Save our updated enemy data
+	# We move this data back into the save memory region:
 	v0 := mob_movement_type
 	v1 := mob_movement_subframe
-
-	#save enemy_data_simple_save
 	save enemy_data_size
 
+
+	# Load up the X Y draw positions:
+	i := temp_e_data_b
+	load v1
+	# For the purposes of collsion, we want to quickly undraw this enemy
+	# Let's save the X Y position into a list
+	# Note that mob_frame IS v2
+	v2 += mob_type
+	v3 := mob_type
+
+	# Generate fast redraw info
+	i := long enemy_fast_redraw
+	i += vE
+	save v3
+
+	# Restore our regular gameplay registers:
 	i := 0x180
 	load vF
 ;
+
+: temp_e_data_b
+ 0 0
+
 
 : calc_mob_draw_xy
 	i := grid_xy
@@ -1602,6 +1722,17 @@ cross_x += off_axis
 	   		   1
 
 :monitor enemy_template 8
+
+: enemy_fast_redraw
+ 0 0 0 -1 0 0 0 0
+ 0 0 0 -1 0 0 0 0
+ 0 0 0 -1 0 0 0 0
+ 0 0 0 -1 0 0 0 0
+
+ 0 0 0 -1 0 0 0 0
+ 0 0 0 -1 0 0 0 0
+ 0 0 0 -1 0 0 0 0
+ 0 0 0 -1 0 0 0 0
 
 : enemy_list
 enemy_framework 1 5 -1
