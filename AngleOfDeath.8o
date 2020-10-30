@@ -162,6 +162,16 @@
 		
 		v0 := 0xE if v0 key then jump trigger_pull
 
+		v0 := 1  if v0 key then jump cross_a
+		v0 := 2  if v0 key then jump cross_b
+		v0 := 3  if v0 key then jump cross_c
+		v0 := 0xC if v0 key then jump cross_d
+
+		v0 := 0xA if v0 key then jump cross_edit_1
+		v0 := 0xB if v0 key then jump cross_edit_2
+
+		: cross_return
+
 		detect_rot := Tx
 		v0 := 7   if v0 key then Tx += -1 # keyboard A
 		v0 := 9   if v0 key then Tx +=  1 # keyboard D
@@ -296,8 +306,49 @@
 
 		: trigger_return
 
+		i := cross_option
+		load v0
+		v2 := v0
+
+		i := long use_crosshair
+
+		v0 := Tx
+		v1 := Ty
+
+		v0 -= 3
+		v1 -= 3
+
+		if v2 == 3 then jump do_jiggle
+
+		if v2 == 1 begin
+			: do_jiggle
+
+			v3 := random 0b00000011
+			if v3 == 0 then v0 += -1
+			if v3 == 3 then v0 += 1
+
+			v3 := random 0b00000011
+			if v3 == 0 then v1 += -1
+			if v3 == 3 then v1 += 1
+		end
+
+		if v2 == 3 then jump do_flicker
+		if v2 == 2 begin
+			: do_flicker
+
+
+			v3 := random 0b00000011
+			if v3 != 0 begin
+				i := long p_crosshair_none
+			end
+		end
+
+		sprite v0 v1 8
+
 		vf := 1
 		f_delay
+
+		sprite v0 v1 8
 
 		i := long register_dump
 		save vF
@@ -1435,7 +1486,7 @@ jump SetupOffPosX
 ;
 
 : last_enemy
- 64
+ -8
 
 : maybe_create_enemy
 	# vF contains the current enemy slot that is empty
@@ -1521,6 +1572,48 @@ jump SetupOffPosX
 	# v1 now has the relative index to this cell in it
 ;
 
+: cross_a
+	i := long p_crosshair_a	
+	jump shared_cross
+: cross_b
+	i := long p_crosshair_b
+	jump shared_cross
+: cross_c
+	i := long p_crosshair_c
+	jump shared_cross
+: cross_d
+	i := long p_crosshair_diamond
+: shared_cross
+	load v7
+	i := long use_crosshair
+	save v7
+jump cross_return
+
+: cross_option
+0
+
+: cross_edit_1
+	i := cross_option
+	load v0
+	v1 := 0x1
+	v0 ^= v1
+	i := cross_option
+	save v0
+
+	jump cross_return
+: cross_edit_2
+
+	i := cross_option
+	load v0
+	v1 := 0x2
+	v0 ^= v1
+	i := cross_option
+	save v0
+
+	jump cross_return
+
+
+
 :calc FREE { 4096 - HERE }
 : FREE_CODE_BYTES
 :byte { FREE >> 8 }
@@ -1599,6 +1692,27 @@ cross_x += off_axis
 0x80 0x80 0x80 0x80 0x80 0x80 0x80 0x80
 
 :macro fast_mob X { :byte { X * 8 } }
+
+
+: p_crosshair_diamond
+0x18 0x24 0x42 0x81 0x81 0x42 0x24 0x18 
+
+: p_crosshair_a
+0x00 0x10 0x10 0x6C 0x10 0x10 0x00 0x00
+
+: p_crosshair_b
+0x00 0x00 0x38 0x28 0x38 0x00 0x00 0x00 
+
+: p_crosshair_c
+0x28 0x00 0x82 0x00 0x82 0x00 0x28 0x00 
+
+: p_crosshair_none
+0 0 0 0 0 0 0 0
+
+
+: use_crosshair
+0 0 0 0 0 0 0 0
+
 
 : mob_spacing
 : grid_xy
