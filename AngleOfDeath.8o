@@ -135,6 +135,13 @@
 	generate_offaxis_max_table
 
 	draw_game_box
+
+	plane 2
+	v0 := 60
+	v1 := 28
+	i := long block_cube
+	sprite v0 v1 8
+	plane 1
 	
 	Tx := 64
 	Ty := 32
@@ -911,6 +918,8 @@ jump SetupOffPosX
 		vF := 0xFF
 		v2 ^= vF
 		v2 += 1
+
+		plane 3
 		
 		loop
 			# We can just step on 1 pixel at a time:
@@ -929,6 +938,7 @@ jump SetupOffPosX
 			i := line_v
 			sprite cross_x cross_y 1
 
+
 			vE += 0b01000000
 			if vE == 0 begin
 				q_delay
@@ -938,6 +948,8 @@ jump SetupOffPosX
 
 			if v6 != 0 then
 		again
+
+		plane 1
 ;
 
 : q_delay
@@ -1659,7 +1671,7 @@ jump SetupOffPosX
 -1 -1 -1 -1 -1 -1 -1
 -1 -1 -1 -1 -1 -1 -1
 -1 -1 -1 -1 -1 -1 -1
--1 -1 -1 -1 -1 -1 -1
+-1 -1 -1 -6 -1 -1 -1
 -1 -1 -1 -1 -1 -1 -1
 -1 -1 -1 -1 -1 -1 -1
 -1 -1 -1 -1 -1 -1 -1
@@ -1757,6 +1769,9 @@ cross_x += off_axis
 0x3C 0x7E 0x7E 0xDB 0x7E 0x7E 0x3C 0x00 0x00 0x18 0x18 0x18 0x18 0x3C 0x7E 0x3C
 0x18 0x04 0x49 0xCB 0xFF 0xBD 0xFF 0x42 0x3C 0x66 0x7E 0x7E 0x00 0x00 0x00 0x00
 
+
+: block_cube
+0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 
 
 :macro enemy_framework X Y T { 16 0 1 X Y T 
 		:byte { T * 16 } 
