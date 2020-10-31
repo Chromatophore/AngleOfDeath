@@ -136,6 +136,9 @@
 
 	draw_game_box
 
+	vF := 16
+	f_delay
+
 	v0 := 0
 	load_level
 	
@@ -344,9 +347,7 @@
 			sprite v0 v1 8
 		end
 
-		
-
-
+		# Try to delay only one 60 fps frame most of the time:
 		vf := 1
 		f_delay
 
@@ -565,7 +566,6 @@ jump SetupOffPosX
 	v2 := 0
 	v3 := 5
 
-	:breakpoint s
 	i := long qtex_clean
 	loop
 		sprite v0 v1 5
@@ -858,11 +858,12 @@ jump SetupOffPosX
 	# Turn off collisions:
 	v5 := 0
 	# Remove them all:
-	sweep_enemies
-	sweep_trash
+	#sweep_enemies
+	#sweep_trash
 	
 	# Activate collision detection
 	v5 := 1
+	:breakpoint g
 	# Test one at a time (as part of v5 being on)
 	sweep_enemies
 	sweep_trash
@@ -870,8 +871,8 @@ jump SetupOffPosX
 	# turn off collision check
 	v5 := 0
 	# And restore the enemies:
-	sweep_enemies
-	sweep_trash
+	#sweep_enemies
+	#sweep_trash
 
 	: line_abort_point
 	# Then undraw the line:
@@ -880,6 +881,7 @@ jump SetupOffPosX
 	load v6
 	v7 := 0
 	if v8 != v6 then pull_trigger_internal_loop
+
 	plane 1
 
 	jump trigger_return
@@ -906,6 +908,10 @@ jump SetupOffPosX
 	 		vE := vF
 			sprite v0 v1 8
 	 		if vE != 0 begin
+				plane 1
+				sprite v0 v1 8
+				plane 2
+
 	 			i := long level_reset_data
 	 			load v2
 	 			i := long quick_trash
@@ -946,6 +952,10 @@ jump SetupOffPosX
 				# This enemy did not touch our line, we can undraw it to stop testing
 				jump trigger_skip_empty_mob
 			end
+
+			plane 1
+			sprite v0 v1 8
+			plane 2
 
 			# Otherwise it does collide, specifically with our line
 			# If that happens, we could remove it from the game here
@@ -1011,8 +1021,6 @@ jump SetupOffPosX
 			if vF != 0 begin
 				# We've hit something we're not allowed to
 				# We have to abort this line
-
-				:breakpoint c
 
 				on_axis := 5
 				off_axis := 4
@@ -1758,6 +1766,7 @@ jump SetupOffPosX
 	plane 2
 
 	:alias trash_counter v7
+	:alias other_trash_counter v8
 
 	mob_y := 0
 	loop
@@ -1787,8 +1796,6 @@ jump SetupOffPosX
 						plane 2
 						# furniture
 						calc_mob_draw_xy
-
-						: draw_obstacles_being_clever
 						i := furniture
 						i += v2
 
@@ -1803,17 +1810,27 @@ jump SetupOffPosX
 
 						v0 := mob_draw_x
 						v1 := mob_draw_y
-						i := quick_trash
+						i := long quick_trash
 						i += trash_counter
 						save v2
 
+						# Draw it because that makes things simpler:
+						i := long furniture
+						i += v2
+
+						sprite mob_draw_x mob_draw_y 8
+
+						v2 := other_trash_counter
+						calc_trash_ui_pos
+						sprite v0 v1 8
+
 						trash_counter += 3
-						jump draw_obstacles_being_clever
+						other_trash_counter += 1
 					end
 				end
 
 				: draw_obstacles_pass_trash
-				vF := 4
+				vF := 8
 				f_delay
 			end
 
@@ -1828,6 +1845,24 @@ jump SetupOffPosX
 
 	i := 0x180
 	load vF
+;
+
+: calc_trash_ui_pos
+	# v2 is trash index
+	v0 := 98
+	v1 := 8
+	if v2 == 0 then jump skip_annoying_math
+	loop
+		v0 += 9
+		:calc what_would_it_be { 98 + 3 * 9 }
+		if v0 == what_would_it_be begin
+			v1 += 9
+			v0 := 98
+		end
+		v2 -= 1
+		if v2 != 0 then
+	again
+	: skip_annoying_math
 ;
 
 : load_level
