@@ -854,22 +854,23 @@ jump SetupOffPosX
 	
 	q_delay
 
+	# We now juse the graphics planes to avoid having to undraw all the enemies by just only drawing them
+	# into the plane 2 where the line currently resides
 	# We have to remove all enemies first and test them individually against the line
 	# Turn off collisions:
-	v5 := 0
+	#v5 := 0
 	# Remove them all:
 	#sweep_enemies
 	#sweep_trash
 	
 	# Activate collision detection
 	v5 := 1
-	:breakpoint g
 	# Test one at a time (as part of v5 being on)
 	sweep_enemies
 	sweep_trash
 
 	# turn off collision check
-	v5 := 0
+	#v5 := 0
 	# And restore the enemies:
 	#sweep_enemies
 	#sweep_trash
@@ -891,8 +892,10 @@ jump SetupOffPosX
 
  : sweep_trash
  	v6 := 0
- 	plane 1
- 	if v5 == 1 then plane 2
+ 	v5 := 0
+ 	#plane 1
+ 	#if v5 == 1 then 
+ 	plane 2
  	loop
 	 	i := long quick_trash
 	 	i += v6
@@ -904,13 +907,24 @@ jump SetupOffPosX
 	 	i += v2
 	 	sprite v0 v1 8
 
-	 	if v5 != 0 begin
+	 	#if v5 != 0 begin
 	 		vE := vF
 			sprite v0 v1 8
 	 		if vE != 0 begin
 				plane 1
 				sprite v0 v1 8
+				
+
+				v2 := v5
+				calc_trash_ui_pos
+
+				v0 -= 1
+				v1 -= 1 
+				
+				i := long trash_get
+				#sprite v0 v1 0
 				plane 2
+				sprite v0 v1 0
 
 	 			i := long level_reset_data
 	 			load v2
@@ -918,12 +932,13 @@ jump SetupOffPosX
 	 			i += v6
 	 			save v2
 	 		end
-	 	end
+	 	#end
 
 	 	: skip_trash_sweep
  		v6 += 3
+ 		v5 += 1
 
- 		if v6 != 21 then
+ 		if v6 != 27 then
  	again
 
  ;
@@ -931,8 +946,9 @@ jump SetupOffPosX
 : sweep_enemies
 	v6 := 0
 
-	plane 1
-	if v5 == 1 then plane 2
+	#plane 1
+	#if v5 == 1 then
+	plane 2
 
 	loop
 		i := long enemy_fast_redraw
@@ -945,7 +961,7 @@ jump SetupOffPosX
 
 		sprite v0 v1 8
 		# Test vF here perhaps
-		if v5 == 1 begin
+		#if v5 == 1 begin
 			vE := vF
 			sprite v0 v1 8
 			if vE == 0 begin
@@ -973,7 +989,7 @@ jump SetupOffPosX
 
 			# And also request that it be removed
 			remove_enemy
-		end
+		#end
 
 		: trigger_skip_empty_mob
 		v6 += 0x08
@@ -1629,7 +1645,7 @@ jump SetupOffPosX
 
 	if mob_movement_type == 0 then return
 	# movement patterns are strided by 8 pairs of bytes
-	i := movement_patterns
+	i := long movement_patterns
 	# we should store the direct access value in this register:
 	i += mob_movement_type
 	i += mob_movement_subframe
@@ -1895,7 +1911,7 @@ jump SetupOffPosX
 		save v6
 
 		v9 += 7
-		:calc g_grid_plus_trash { 49 + 3 * 7 }
+		:calc g_grid_plus_trash { 49 + 4 * 7 }
 		if v9 != g_grid_plus_trash then
 	again
 	v9 := 0
@@ -1958,8 +1974,9 @@ jump SetupOffPosX
 -1 -1 -1 -1 -1 -1 -1
 -1 -1 -1 -1 -1 -1 -1
 
-: quick_trash # 7 x 3 items:
+: quick_trash # 7 x 4 items:
 0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	
+0 0 0   0 0 0   0
 
 # I would waste so much memory just writing out the levels
 # like this but at least I can see them and decide if they're good
@@ -2227,6 +2244,9 @@ cross_x += off_axis
 0x00 0x00 0x3E 0x49 0x6B 0x3A 0x2E 0x3E 0x00 0x36 0x7F 0x7F 0x3E 0x3E 0x3E 0x7F
 0x00 0x81 0x7E 0x4A 0x52 0x7E 0x81 0x00 0x00 0x14 0x08 0x3C 0x42 0x42 0x42 0x3C
 
+: trash_get # oversize 16x16 sprite because I hate work
+0xC1 0x80 0xE3 0x80 0x77 0x00 0x3E 0x00 0x1C 0x00 0x3E 0x00 0x77 0x00 0xE3 0x80
+0xC1 0x80 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
 
 : qtex_clean
 0x7A 0x82 0x82 0x82 0x7B 0x0F 0x08 0x0E 0x08 0xEF 0x88 0x14 0x22 0x3E 0xA2 0x88
@@ -2530,4 +2550,4 @@ mpat_8  1 -1
 #:monitor quick_off_axis 90
 
 :monitor crosshair_1_data 10
-:monitor quick_trash 21
+:monitor quick_trash 27
