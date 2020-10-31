@@ -869,6 +869,14 @@ jump SetupOffPosX
 	sweep_enemies
 	sweep_trash
 
+	# if v7 is 0 then we got all the trash:
+	if v7 == 0 begin
+
+		:breakpoint level_complete
+		v0 := v0
+
+	end
+
 	# turn off collision check
 	#v5 := 0
 	# And restore the enemies:
@@ -891,9 +899,16 @@ jump SetupOffPosX
  0 0
 
  : sweep_trash
+ 	# use v6 to count in 3s
  	v6 := 0
+ 	# Use v5 to count linearly now:
  	v5 := 0
  	#plane 1
+
+ 	# We can also use v7 at this time:
+
+ 	v7 := 0
+
  	#if v5 == 1 then 
  	plane 2
  	loop
@@ -903,6 +918,9 @@ jump SetupOffPosX
 
 	 	if v2 == -1 then jump skip_trash_sweep
 
+	 	# At least 1 item of trash remains
+	 	v7 += 1
+
 	 	i := long furniture
 	 	i += v2
 	 	sprite v0 v1 8
@@ -911,9 +929,12 @@ jump SetupOffPosX
 	 		vE := vF
 			sprite v0 v1 8
 	 		if vE != 0 begin
+
+	 			v7 += -1
 				plane 1
 				sprite v0 v1 8
 				
+
 
 				v2 := v5
 				calc_trash_ui_pos
