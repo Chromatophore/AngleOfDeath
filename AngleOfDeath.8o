@@ -908,7 +908,27 @@ jump SetupOffPosX
 	# if v7 is 0 then we got all the trash:
 	if v7 == 0 begin
 		#:breakpoint level_complete
-		v0 := v0
+		# Get the level we loaded:
+		i := load_level_number
+		load v0
+		# We must have completed this level
+		vA := v0
+
+		i := long level_select_last
+		load v3
+		# v0: current level
+		# v1: total levels unlocked
+		# v2: total levels competed
+		# v3: current chapter
+
+		vA += 1
+		v2 := vA
+		vA += 1
+		v1 := vA
+
+		i := long level_select_last
+		save v3
+
 		jump game_restart
 	end
 
@@ -1747,7 +1767,7 @@ jump SetupOffPosX
 	load v1
 	# next X Y coords loaded into v0 v1
 	# Set the enemy to these coords
-	i := enemy_template_save_target
+	i := long enemy_template_save_target
 	save v3
 
 	# Check this cell is actaully available:
@@ -1763,7 +1783,7 @@ jump SetupOffPosX
 	v0 := vE
 	save v0
 
-	i := enemy_template
+	i := long enemy_template
 	load v7
 
 	i := long enemy_list
@@ -2000,6 +2020,9 @@ jump SetupOffPosX
 
 : level_select_mode
 	# Captures gameplay and allows the player to select a level
+
+	:breakpoint f
+
 	plane 3
 	clear
 	plane 1
@@ -2846,3 +2869,4 @@ mpat_8  1 -1
 
 :monitor crosshair_1_data 10
 :monitor quick_trash 27
+:monitor level_select_last 4
