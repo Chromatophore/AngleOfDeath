@@ -617,6 +617,7 @@ jump SetupOffPosX
 	v0 := 96
 	v1 := 50
 	i := long qtex_score
+	qtex
 ;
 
 : qtex
@@ -884,7 +885,7 @@ jump SetupOffPosX
 	vE := 0
 	
 	i := 0x180
-	save v6
+	save vF
 
 		# Our loop here:
 		# v0 = cross_x
@@ -897,6 +898,15 @@ jump SetupOffPosX
 		# v7 = check for collisions with player sweep
 		# v8 = end condition
 		# vE = Allows for the delay of frames
+
+	# Track points with this:
+	Tx := 0
+	# Starting points should be the current number of sweeps:
+	i := long sweeps_this_level
+	# Let's get XO chip finally
+	load Tr - Tr
+	vF := 10
+	Tr =- vF
 
 	# Draw the line
 	# in theory if we hit something we're not supposed to, we need to crash out
@@ -925,8 +935,19 @@ jump SetupOffPosX
 	# Activate collision detection
 	v5 := 1
 	# Test one at a time (as part of v5 being on)
-	sweep_enemies
 	sweep_trash
+	if Tx == 0 then Tr := 0
+	sweep_enemies
+
+
+	plane 1
+	draw_score
+	i := long score_this_level
+	load v0
+	v0 += Tx
+	i := long score_this_level
+	save v0
+	draw_score
 
 	# if v7 is 0 then we got all the trash:
 	if v7 == 0 begin
@@ -937,7 +958,6 @@ jump SetupOffPosX
 		v1 := 2
 		loop
 			buzzer := v1
-
 			vF := 10
 			f_delay
 			v0 -= 1
@@ -975,6 +995,7 @@ jump SetupOffPosX
 	#sweep_enemies
 	#sweep_trash
 
+
 	: line_abort_point
 	# Then undraw the line:
 	i := 0x180
@@ -983,7 +1004,8 @@ jump SetupOffPosX
 	v7 := 0
 	if v8 != v6 then pull_trigger_internal_loop
 
-	plane 1
+	i := 0x180
+	load vF
 
 	jump trigger_return
 	
@@ -1026,7 +1048,8 @@ jump SetupOffPosX
 				plane 1
 				sprite v0 v1 8
 				
-
+				Tx += Tr
+				if Tr != 0 then Tr += 1
 
 				v2 := v5
 				calc_trash_ui_pos
@@ -1081,6 +1104,9 @@ jump SetupOffPosX
 				# This enemy did not touch our line, we can undraw it to stop testing
 				jump trigger_skip_empty_mob
 			end
+
+			Tx += Tr
+			if Tr != 0 then Tr += 1
 
 			plane 1
 			sprite v0 v1 8
@@ -1156,13 +1182,19 @@ jump SetupOffPosX
 
 				v8 := v6
 
+				plane 3
 				loop
+					scroll-up 1
 					buzzer := off_axis
-					vF := 8
+					vF := 4
 					f_delay
 					on_axis -= 1
+					scroll-down 1
+					vF := 4
+					f_delay
 					if on_axis != 0 then
 				again
+				plane 2
 
 				sprite cross_x cross_y 1
 				v7 := 2
@@ -1925,7 +1957,7 @@ jump SetupOffPosX
 						plane 2
 						# furniture
 						calc_mob_draw_xy
-						i := furniture
+						i := long furniture
 						i += v2
 
 						sprite mob_draw_x mob_draw_y 8
@@ -2243,8 +2275,11 @@ jump SetupOffPosX
 	v0 := 0
 	i := long sweeps_this_level
 	save v0
+	i := long score_this_level
+	save v0
 
 	draw_sweeps
+	draw_score
 ;
 
 : increase_sweeps
@@ -2263,12 +2298,41 @@ jump SetupOffPosX
 ;
 
 : draw_sweeps
+	v1 := 28
+	v2 := 56
+	q_dig
+;
+
+: draw_score
+	i := long score_this_level
+	load v0
+
+	i := 0x170
+	bcd v0
+
+	load v0
+	v1 := 108
+	v2 := 56
+	q_dig
+
+	i := 0x171
+	load v0
+	v1 += 6
+	q_dig
+
+	i := 0x172
+	load v0
+	v1 += 6
+	q_dig
+
+	:monitor 0x170 3
+;
+
+: q_dig
 	i := mul_5
 	i += v0
 	load v0
-	v1 := 28
-	v2 := 56
-	i := fivewide_digits
+	i := long fivewide_digits
 	i += v0
 	sprite v1 v2 5
 ;
@@ -2297,7 +2361,10 @@ jump SetupOffPosX
 0x08 0x08 0x88 0x50 0x20 0x50 0x88 
 
 : sweeps_this_level
-0
+0 
+
+: score_this_level
+0 0 0
 
 : wipey_wipe
 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -2966,9 +3033,7 @@ mpat_8  1 -1
  	# This will be a ~ 5kb data structure of all our data
 
 :calc probably_offaxis_data { quick_tan_table + 44 * 128 }
-:monitor probably_offaxis_data 128
 #:monitor quick_off_axis 90
 
-:monitor crosshair_1_data 10
-:monitor quick_trash 27
+:monitor sweeps_this_level 2
 :monitor level_select_last 4
