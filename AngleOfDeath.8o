@@ -174,6 +174,23 @@
 	vF := 16
 	f_delay
 
+	i := long sweeper_walk_broom
+	v0 := 8
+	v1 := 8
+	sprite v0 v1 0
+
+	i := long sweeper_platform_a
+	v0 := 0
+	v1 += 16
+	sprite v0 v1 1
+	i := long line_h
+	v0 += 8
+	sprite v0 v1 1
+	v0 += 8
+	sprite v0 v1 1
+	v0 += 8
+	sprite v0 v1 1
+
 	# Reset sweeps for this level:
 	reset_sweeps
 
@@ -1006,6 +1023,7 @@ jump SetupOffPosX
 
 	i := 0x180
 	load vF
+	plane 1
 
 	jump trigger_return
 	
@@ -2002,6 +2020,8 @@ jump SetupOffPosX
 		if mob_y != 7 then
 	again
 
+
+
 	plane 1
 
 	i := 0x180
@@ -2392,9 +2412,9 @@ jump SetupOffPosX
 : level_select_last
  1 1 0 0 0 0 0
 
-# Level number						Sweep Par				Player Score
-# 				Has been completed			  Player Sweeps
-:macro a_level_save X Y { X 0 Y 0 0 }
+# Level number						Sweep Par				Player Score Max 					Player Score Min
+# 				Has been completed			  Player Sweeps Max				  Player Sweeps Min
+:macro a_level_save X Y { X 0 Y 0  0 0 0 0 }
 
 : level_progress
 a_level_save  0 4
@@ -2437,7 +2457,9 @@ a_level_save 11 4
  i := long level_lr_1
  i := long level_lr_2
  i := long level_lr_3
- i := long level_lr_1
+ i := long level_lr_4
+ i := long level_lr_5
+ i := long level_lr_6
 
 : enemies_load
  i := long level_lr_1_enemy
@@ -2497,12 +2519,81 @@ a_level_save 11 4
 : level_lr_1
 ob 0	1 2
 ob 6	6 5
+
 tr 0	2 0
 tr 1    5 2
 tr 2	3 4
 tr 3	0 5
 tr 2	6 6
 -1
+
+: level_lr_2
+ob 1	1 3
+ob 4	1 6
+ob 5	6 4
+
+tr 3	4 4
+tr 4    1 1
+tr 1	2 6
+tr 5	4 2
+-1
+
+: level_lr_3
+ob 0	1	5
+ob 8	5	3
+ob 9	6	3
+ob 10	6	0
+ob 10	0	2
+
+tr 10	3	2
+tr 3	0	2
+tr 2	1	3
+tr 13	5	4
+-1
+
+: level_lr_4
+ob 7	6	5
+ob 8	0	2
+ob 9	1	2
+ob 13	1	5
+
+tr 3	2	5
+tr 13	2	2
+tr 5	4	5
+tr 14	4	3
+tr 4	5 	6
+tr 7	3	1
+-1
+
+: level_lr_5
+ob 14	1	1
+ob 2	1	3
+ob 12	4	6
+ob 13	5	6
+ob 3	6	2
+ob 15	4	3
+
+tr 7	3	3
+tr 11	6	5
+tr 3	1	6
+-1
+
+
+: level_lr_6
+ob 4	5	3
+ob 5	1	4
+ob 10	6	6
+ob 11	3	2
+ob 14	4	4
+
+tr 13	3	6
+tr 7	1	0
+tr 14	3	2
+tr 6	6	1
+tr 15	1	5
+-1
+
+
 
 #	 0		1		2		3		4		5		6
 #	-1		-1		a		-1		-1		-1		-1	# 0
@@ -2545,52 +2636,6 @@ tr 2	6 6
 : level_lr_6_enemy
 	10
 		64 48 64 16 16 48 48 16 64 64 
-
-: level_lr_2
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		ob 12	ob 13	-1		-1		-1
-
-: level_lr_3
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		ob 7	-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
-
-: level_lr_4
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
-
-: level_lr_5
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1 		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
-
-: level_lr_6
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
--1		-1		-1		-1		-1		-1		-1
-
 
 # Let's decide that a level is defined in memory entirely as a grid
 # and we draw in obsticles with negative numbers
@@ -2970,6 +3015,24 @@ mpat_8  1 -1
 
 : level_select_marker_final
 0x38 0x44 0xBA 0xFA 0xBA 0x44 0x38 0x00
+
+: ringus
+0x07 0xE0 0x1F 0xF8 0x3F 0xFC 0x7C 0x3E 0x70 0x0E 0xF0 0x0F 0xE0 0x07 0xE0 0x07
+0xE0 0x07 0xE0 0x07 0xF0 0x0F 0x70 0x0E 0x7C 0x3E 0x3F 0xFC 0x1F 0xF8 0x07 0xE0
+
+
+: sweeper_walk_broom
+0x00 0x00 0xAA 0x00 0xFE 0x00 0x7C 0x00 0x10 0x00 0x13 0xE0 0x17 0xF0 0x17 0x50
+0x17 0x50 0x13 0xF0 0x1F 0xE0 0x1F 0xC0 0x1F 0xE0 0x17 0xE0 0x17 0xE0 0x3F 0xF0
+0xAA 0x00 0xFE 0x00 0x7C 0x00 0x10 0x00 0x10 0x00 0x13 0xE0 0x17 0xF0 0x17 0x50
+0x17 0x50 0x1F 0xF0 0x1F 0xE0 0x1F 0xC0 0x17 0xE0 0x17 0xE0 0x3F 0xF0 0x1F 0xF0
+0x55 0x00 0x7F 0x00 0x3E 0x00 0x08 0x00 0x08 0x00 0x09 0xF0 0x0B 0xF8 0x0B 0xA8
+0x0B 0xA8 0x0F 0xF8 0x0F 0xF0 0x0F 0xE0 0x0F 0xE0 0x0F 0xF0 0x1F 0xF0 0x3F 0xF8
+0x00 0x00 0x55 0x00 0x7F 0x00 0x3E 0x00 0x08 0x00 0x09 0xF0 0x0B 0xF8 0x0B 0xA8
+0x0B 0xA8 0x09 0xF8 0x0F 0xF0 0x0F 0xE0 0x0F 0xE0 0x0F 0xF0 0x0F 0xF0 0x1F 0xF0
+
+: sweeper_platform_a
+0b00011111
 
 ##################################
 
