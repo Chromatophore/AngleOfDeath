@@ -127,14 +127,36 @@
 	i := long random_mob_position
 	save v0
 
-	clear
-	hires
-
 	# Generate quick off_axis table
 	generate_tan_table
 	generate_offaxis_max_table
 
+: game_restart
+	plane 1
+	clear
+	hires
+
 	draw_game_box
+
+	i := enemy_fast_wipe
+	load v7
+	v8 := 8
+	i := enemy_fast_redraw
+	loop
+		save v7
+		v8 -= 1
+		if v8 != 0 then
+	again
+
+	i := enemy_list_wipe
+	load v7
+	v8 := 8
+	i := enemy_list
+	loop
+		save v7
+		v8 -= 1
+		if v8 != 0 then
+	again	
 
 	vF := 16
 	f_delay
@@ -871,10 +893,9 @@ jump SetupOffPosX
 
 	# if v7 is 0 then we got all the trash:
 	if v7 == 0 begin
-
-		:breakpoint level_complete
+		#:breakpoint level_complete
 		v0 := v0
-
+		jump game_restart
 	end
 
 	# turn off collision check
@@ -2289,8 +2310,12 @@ cross_x += off_axis
 
 :monitor enemy_template 8
 
+: enemy_list_wipe
+enemy_framework 0 0 -1
+
 : enemy_fast_wipe
 0 0 0 -1 0 0 0 0
+
 
 : enemy_fast_redraw
  0 0 0 -1 0 0 0 0
