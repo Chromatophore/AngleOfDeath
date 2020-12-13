@@ -129,2415 +129,38 @@
 
 # We will already have the rotation table set correctly, so, we don't need to worry about that
 
-:alias enemy_data_size v7
-:alias enemy_data_simple_save v2
 
-# EZ-Writer implimentation macro:
-:macro ez_print ADDRESS {
-	:calc hi { 0xFF & ADDRESS >> 8 }
-	:calc lo { 0xFF & ADDRESS }
-	v0 := hi
-	v1 := lo
-	print-string
-}
+#### The big hopeful redo on code layout
+#### Basically: I have grown too frustrated with label issues so here we are.
+# We're going to interleave the code and data and have the preprocessor arrange them for us
+# Apparently this will resolve most forward reference issues
 
-: main
-	
-	# pick a random start point
-	v0 := random 0b01111110
-	i := long random_mob_position
-	save v0
+# in XO-Chip we want to lay out all our graphics data
+# in high RAM, and reserve low RAM for code.
+# these macros allow us to interleave building up
+# each segment of the program:
 
-	# Generate quick off_axis table
-	generate_tan_table
-	generate_offaxis_max_table
 
 
-	clear
+:calc CODE_POS { 0x200  }
+:calc DATA_POS { 0x1000 }
+# I genuintely don't know how these actually work. I know what they do, but
+# Literally, looking at them, I have no clue:
+:macro to-code { :calc DATA_POS { HERE }  :org { CODE_POS } }
+:macro to-data { :calc CODE_POS { HERE }  :org { DATA_POS } }
 
-	i := long just_want_to_draw_the_damn_text
-	load v1
-	load v1
-	print-string
-	#ez_print title_screen_text
-	v0 := key
 
 
-	hires
-
-: game_restart
-
-
-	i := long enemy_fast_wipe
-	load v7
-	v8 := 8
-	i := long enemy_fast_redraw
-	loop
-		save v7
-		v8 -= 1
-		if v8 != 0 then
-	again
-
-	i := long enemy_list_wipe
-	load v7
-	v8 := 8
-	i := long enemy_list
-	loop
-		save v7
-		v8 -= 1
-		if v8 != 0 then
-	again	
-
-	level_select_mode
-
-	i := load_level_number
-	save v0
-
-	plane 3
-	clear
-	plane 1
-	hires
-
-	i := wipey_wipe
-	load vF
-
-	draw_game_box
-
-	vF := 16
-	f_delay
-
-	i := long sweeper_walk_broom
-	v0 := 8
-	v1 := 8
-	sprite v0 v1 0
-
-	i := long sweeper_platform_a
-	v0 := 0
-	v1 += 16
-	sprite v0 v1 1
-	i := long line_h
-	v0 += 8
-	sprite v0 v1 1
-	v0 += 8
-	sprite v0 v1 1
-	v0 += 8
-	sprite v0 v1 1
-
-	# Reset sweeps for this level:
-	reset_sweeps
-
-	:next load_level_number
-	v0 := 0
-	load_level
-	
-
-	
-	Tx := 64
-	Ty := 32
-	Tr := 0
-	TrZ := 0b0010
-
-	draw_crosshairs_from_memory
-
-	update_trz_code
-
-	v0 := TrZ
-	v2 := Tr
-
-	:macro calc_next_crosshair {
-		next_crosshair := random 0b00001111
-		next_crosshair += 4
-	}
-	calc_next_crosshair
-	jump0 update_rotation_code
-
-	loop
-
-		v0 := 0 if v0 key begin
-			:breakpoint q
-			v0 += 1
-		end
-
-		# Let's handle input:
-		# It would be handy to know if the player has not pushed any input
-
-		:alias detect_rot v5
-		:alias player_input v6
-
-		player_input := 0
-		
-		v0 := 0xE if v0 key then jump trigger_pull
-
-		: cross_return
-
-		detect_rot := Tx
-		v0 := 7   if v0 key then Tx += -1 # keyboard A
-		v0 := 9   if v0 key then Tx +=  1 # keyboard D
-		if Tx != detect_rot then player_input += 1
-
-		detect_rot := Ty
-		v0 := 5   if v0 key then Ty += -1 # keyboard W
-		v0 := 8   if v0 key then Ty +=  1 # keyboard S
-		if Ty != detect_rot then player_input += 1
-
-		# We only have to run this code if they push a button:
-		if player_input == 0 then jump service_rot
-
-		# Gate player
-		if Tx == player_LEFT_LIMIT then Tx += 1 # ie, go right
-		if Tx == player_RIGHT_LIMIT then Tx += -1
-		if Ty == player_TOP_LIMIT then Ty += 1
-		if Ty == player_LOW_LIMIT then Ty += -1
-
-		# We will use v5 to indicate we're trying to change rotation:
-
-		: service_rot
-		detect_rot := Tr
-		v0 := 4   if v0 key then Tr += -1 # keyboard Q
-		v0 := 6   if v0 key then Tr +=  1 # keyboard E
-		# Skip rotation update if rotation is unchanged:
-		if detect_rot == Tr then jump update_rotation_code_return
-
-		# Here, if detect_rot is 0 and player_input is 0 then we
-		# don't need to update our positions
-
-		# if player_input is 1 but detect_rot is 0 then we don't need
-		# to update rot
-
-		# if player_input is 0 but detect_rot is 1, then we still
-		# need to update stuff
-
-		# 0 0 nothing
-		# 1 0 pos only
-		# ? 1 both
-
-		# begin
-			# This code runs only on r change
-			player_input += 1
-
-			if Tr == 45 begin
-				Tr := 0
-				TrZ += 0b010
-				if TrZ == 0b010000 then TrZ := 0
-				update_trz_code
-			end
-			if Tr == -1 begin
-				Tr := 44
-				TrZ -= 0b010 # mm sugar
-				if TrZ == 0b11111110 then TrZ := 0b001110
-				update_trz_code
-			end
-			# Rotation must have changed for us to be here:
-			# if __1_, then Tr can be used to index into the tan table normally
-			# if __0_, then the correct value is 45 - Tr
-
-			# Here's a mad solution:
-			v0 := TrZ
-			v2 := Tr
-			jump0 update_rotation_code
-		# end
-		: update_rotation_code_return
-			# Here, we KNOW that the player pushed something
-			# Can we all directly into the update code?
-
-		# Undraw the existing cursors:
-		draw_crosshairs_from_memory
-
-		# Perform duty cycle
-		i := frame_cycle_count
-		load v0
-		v0 += 8
-		if v0 == 64 begin
-
-			# calculate small offset to player crosshair
-			i := player_crosshair_adjust
-			v0 := random 0b00000011
-			v0 -= 4
-			if v0 == -1 then v0 := -3
-			v1 := random 0b00000011
-			v1 -= 4
-			if v1 == -1 then v1 := -3
-			save v1
-
-			v0 := 0
-			frame_stepper += 0x80
-
-		end
-		i := frame_cycle_count
-		save v0
-
-		# If player_input is true then we must redraw
-		# if it is 0 then we can use saved values
-		if player_input == 0 begin
-			# DONT UPDATE STUFF:
-			draw_crosshairs_from_memory
-			jump bypass_crosshair_update
-		end
-
-		if next_crosshair != 0 then next_crosshair += -1
-
-		############ UPDATE STUFF
-		# Calculate first:
-		DoFirstCrosshair
-		: apply_on_axis_main_memory
-		apply_on_axis_main
-		# cross_x and y are v0 and v1
-
-		# it is INCREDIBLY helpful to retain the original axis values
-		: address_crosshair_1_data_memory
-		i := crosshair_1_data
-		save off_axis
-
-		i := crosshair_b
-		if frame_stepper != 0 then i := crosshair_a
-		sprite cross_x cross_y 3
-
-		DoSecondCrosshair
-		: apply_on_axis_flipped_memory
-		apply_on_axis_flipped
-
-		: address_crosshair_2_data_memory
-		i := crosshair_2_data
-		save off_axis
-
-		i := crosshair_a
-		if frame_stepper != 0 then i := crosshair_b
-		sprite cross_x cross_y 3
-
-		: bypass_crosshair_update
-
-		# Let's service enemies in the field
-		# We don't need to process them all
-		# But we do need to process them at all
-
-		## v0 is our current frame cycle value
-
-		service_enemy
-
-		: trigger_return
-
-
-		if next_crosshair == 1 then jump draw_player_crosshair
-
-		if next_crosshair == 0 begin
-			: draw_player_crosshair
-			# Draw crosshair
-
-			i := player_crosshair_adjust
-			load v1
-
-			i := long player_crosshair
-			v0 += Tx
-			v1 += Ty
-			#v0 -= 3
-			#v1 -= 3
-
-			sprite v0 v1 8
-		end
-
-		# Try to delay only one 60 fps frame most of the time:
-		vf := 1
-		f_delay
-
-		if next_crosshair == 1 then jump undraw_player_crosshair
-		if next_crosshair == 0 begin
-			calc_next_crosshair
-			: undraw_player_crosshair
-			# Undraw crosshair
-			sprite v0 v1 8
-		end
-		next_crosshair += -1
-
-		i := long register_dump
-		save vF
-
-
-
-
-	again
-
-
-
-
-	jump main
-
-: frame_cycle_count
-  0
-
-: player_crosshair_adjust
- 0 0
-
-
-: draw_crosshairs_from_memory
-	i := crosshair_1_data
-	load cross_y
-	i := crosshair_b
-	if frame_stepper != 0 then i := crosshair_a
-	sprite cross_x cross_y 3
-
-	i := crosshair_2_data
-	load cross_y
-	i := crosshair_a
-	if frame_stepper != 0 then i := crosshair_b
-	sprite cross_x cross_y 3
-;
-
-: crosshair_1_data
- 0x5b 0x1F 
- 			: crosshair_1_subpixels
- 			0x1C 
- 				: crosshair_1_onaxis
- 				0 0
-: crosshair_2_data
- 0x22 0x1F
- 			: crosshair_2_subpixels
- 			0x1D
- 				: crosshair_2_onaxis
- 				0 0
-
-
-# These are determined by our current rotation
-: apply_on_axis_main
-	: simple_axis_apply_target_A
-	vF := vF
-	vF := vF
-;
-
-: apply_on_axis_flipped
-	: simple_axis_apply_target_B
-	vF := vF
-	vF := vF
-;
-
-: DoSecondCrosshair
-	v0 := TrZ
-	vF := 0b1000
-	v0 ^= vF
-	jump0 SetupOnAxis	# Note shared return path
-
-: DoFirstCrosshair
-	v0 := TrZ
-	jump0 SetupOnAxis
-	############ ->>>>>>>>>>>>
-
-	: AxesReturnPoint
-	# Store the final subpixel value into v2:
-	v2 := v1
-
-	# This is going to nuke v0 and v1
-	cross_x := Tx
-	cross_x -= 1
-	cross_y := Ty
-	cross_y -= 1
-;
-
-: SetupOnAxis
-# 0000 # On axis: +X, off axis -Y
-jump SetupOnPosX
-# 0010 # On axis: +X, off axis +Y
-jump SetupOnPosX
-# 0100 # On axis: +Y, off axis +X
-jump SetupOnPosY
-# 0110 # On axis: +Y, off axis -X
-jump SetupOnPosY
-# 1000 # On axis: -X, off axis +Y
-jump SetupOnNegX
-# 1010 # On axis: -X, off axis -Y
-jump SetupOnNegX
-# 1100 # On axis: -Y, off axis -X
-jump SetupOnNegY
-# 1110 # On axis: -Y, off axis +X
-jump SetupOnNegY
-
-: SetupOffAxis
-# 0000 # On axis: +X, off axis -Y
-jump SetupOffNegY
-# 0010 # On axis: +X, off axis +Y
-jump SetupOffPosY
-# 0100 # On axis: +Y, off axis +X
-jump SetupOffPosX
-# 0110 # On axis: +Y, off axis -X
-jump SetupOffNegX
-# 1000 # On axis: -X, off axis +Y
-jump SetupOffPosY
-# 1010 # On axis: -X, off axis -Y
-jump SetupOffNegY
-# 1100 # On axis: -Y, off axis -X
-jump SetupOffNegX
-# 1110 # On axis: -Y, off axis +X
-jump SetupOffPosX
-
-# 0000
-		# On axis: +X, off axis -Y
-: SetupOnPosX
-	on_axis := UR_X
-	on_axis -= Tx
-	jump0 SetupOffAxis
-
-: SetupOnNegX
-	on_axis := Tx
-	on_axis -= UL_X
-	jump0 SetupOffAxis
-
-: SetupOnPosY
-	on_axis := LL_Y
-	on_axis -= Ty
-	jump0 SetupOffAxis
-
-: SetupOnNegY
-	on_axis := Ty
-	on_axis -= UL_Y
-	jump0 SetupOffAxis
-
-
-: SetupOffPosX
-	off_axis := UR_X
-	off_axis -= Tx
-	jump get_off_axis
-
-: SetupOffNegX
-	off_axis := Tx
-	off_axis -= UL_X
-	jump get_off_axis
-
-: SetupOffPosY
-	off_axis := LL_Y
-	off_axis -= Ty
-	jump get_off_axis
-
-: SetupOffNegY
-	off_axis := Ty
-	off_axis -= UL_Y
-	jump get_off_axis
-
-
-: draw_game_box
-
-	v0 := UL_X
-
-	v1 := UL_Y
-	v2 := LL_Y
-
-	i := long line_h
-
-	loop
-		sprite v0 v1 1
-		sprite v0 v2 1
-
-		v0 += 8
-		if v0 != UR_Max8 then
-	again
-
-	i := long line_h_2
-	sprite v0 v1 1
-	sprite v0 v2 1
-
-	
-
-	v0 := UL_X
-	v1 := UR_X
-	v2 := UL_Y_plus1
-
-	i := long line_v
-
-	loop
-		sprite v0 v2 8
-		sprite v1 v2 8
-
-		v2 += 8
-		if v2 != LL_Max8 then
-	again
-
-	v0 := 95
-	v1 := 1
-	i := long qtex_clean
-	qtex
-
-	v0 := 3
-	v1 := 29
-	i := long qtex_sweep
-	qtex
-
-	v0 := 3
-	v1 := 56
-	i := long qtex_rank
-	qtex
-
-	v0 := 96
-	v1 := 50
-	i := long qtex_score
-	qtex
-;
-
-: qtex
-	v2 := 0
-	v3 := 5
-	loop
-		sprite v0 v1 5
-		v0 += 8
-		v2 += 1
-		i += v3
-		if v2 != 4 then
-	again
-;
-
-: get_off_axis
-	# Takes:
-	# on_axis: the large value of the triangle
-	# off_axis: the maximun acceptable value for the triangle
-
-	# Returns:
-	# on_axis on final axis vector
-	# off_axis off final axis vector
-	# 
-
-	:alias work_rot v2
-	:alias WIP_off v5
-
-	# Yep you guessed it self modifying code:
-	:next quick_rot_for_axis
-	work_rot := 0x00
-
-	# if they're literally presenting a 0 degree angle, then, we have no off axis to calculate
-	if work_rot == 0 begin
-		off_axis := 0
-		v1 := 0x80
-		# Obviously, this is already the case:
-		# on_axis := on_axis
-		jump AxesReturnPoint
-	end
-
-	if work_rot == 45 begin
-		# This case is a little more complicated, but in essence
-
-		# if we need to remember to set v1 register to subpixels count
-		# then we can do that here:
-		v1 := 0x80
-
-		# What on and off axis are is... vague
-		# But if either axis is less than the other then that's the minimum
-
-		if on_axis > off_axis then on_axis := off_axis
-		if off_axis > on_axis then off_axis := on_axis
-		jump validated_off_axis
-		end
-	
-	
-	# Also modify our backup plan memory read as this is the unadjusted base of the table
-	# This is whe data we want to adjust:
-	: offaxis_mem_read_base
-	i := long quick_tan_table
-	:calc offaxis_mem_read { offaxis_mem_read_base + 2 }
-
-	i += on_axis
-	i += on_axis
-
-	load v1
-	# v0 will be total off axis displacement
-	# v1 will be the remaining subpixels at this point
-
-	WIP_off := v0
-
-
-	if WIP_off > off_axis begin
-		# unfortunately, this exceeds our stated maximum
-		# We could raycast however we can also precompute the best result
-		# for every one of these, like we do for the on_axis read
-
-		# if we do this then we lose the knowledge of what our subpixels are
-		# Maybe it's best just to get our subpixels again when we need them?
-
-		WIP_off := off_axis
-		0xF0 00
-		: off_axis_table_address
-		0 0
-
-		i += off_axis
-		load v0
-
-		:monitor off_axis_table_address 2
-		# We must not exend on access though:
-		if v0 < on_axis then on_axis := v0
-	end
-	# otherwise this is a perfectly find on axis length
-	off_axis := WIP_off
-
-	: validated_off_axis
-	# If this off axis in excess of our maximum?
-	# Who knows
-	jump AxesReturnPoint
-
-
-: set_i_to_offaxis
-	0xF0 00
-	: mem_generic_off_axis
-	0 0
-;
-
-
-
-# This is a jump table
-# We are going to receive one of the 8 zones here:
-# Uses up code, but is in principal faster than anding out the bits.
-# Maybe
-# jump0 -> jumpT -> Entry
-# vF := 0b10 -> vf &= TrZ -> if vf then Entry / Entry
-: update_rotation_code
-	jump flip_rotation
-	jump leave_rotation
-
-	jump flip_rotation
-	jump leave_rotation
-
-	jump flip_rotation
-	jump leave_rotation
-
-	jump flip_rotation
-	jump leave_rotation
-	# Rotation must have changed for us to be here:
-	# if __0_, then the correct value is 45 - Tr
-	# if __1_, then Tr can be used to index into the tan table normally
-
-# We save a copy of the normalisd rotation into memory here
-: rotation_normalised
-	0
-# v0 will be a safe copy of TrZ
-# v2 is a copy of the rotation
-: flip_rotation
-	v1 := 45
-	v2 =- v1
-: leave_rotation
-	# At this time v2 now contains our correct rotation value for our tables:
-	# v2: Rotation to use for quick_tan
-
-	# let's save this
-	v0 := v2
-	i := rotation_normalised
-	save v0
-
-	# We need to obtain the memory address of the pregenerated memory from quick_tan
-	i := long quick_tan
-	# Add rotation, twice:
-	i += v2
-	i += v2
-	load v1
-	# v0 v1 now contain the correct value for the starting memory address for this rotation
-
-	i := offaxis_mem_read
-	save v1
-
-	i := long quick_off_axis
-	i += v2
-	i += v2
-	load v1
-	i := off_axis_table_address
-	save v1
-	i := mem_generic_off_axis
-	save v1
-
-	# Also, set the value for rotation in get_off_axis:
-	v0 := v2
-	i := quick_rot_for_axis
-	save v0
-
-	jump update_rotation_code_return
-
-	# Technically we only need to like, do this, if TrZ has changed:
-: update_trz_code
-	# put a doubled version in vE
-	vE := TrZ
-	vE += TrZ
-
-	i := long simple_axis_apply
-	i += vE
-	load v3
-
-	i := simple_axis_apply_target_A
-	save v3
-
-	# put the correct value to bitflip to the opposrite side:
-	vF := 0b10000
-	vE ^= vF
-	i := long simple_axis_apply
-	i += vE
-	load v3
-
-	i := simple_axis_apply_target_B
-	save v3
-
-	# Then we must return, and, we jumped here, so
-;
-
-: trigger_pull
-	# We want to strobe a pixel from crosshair_a to crosshair_b
-	# We know the real positions of these crosshairs in crosshair_1_data
-	# And we know the on and off axis values relative to the player
-
-	# No matter what we are pulling the trigger here
-
-	# We use up to v8 in this function, which is ok and doesn't affect normal gameplay
-
-	v2 := random 0x01
-	if v2 == 0 then	i := address_crosshair_1_data_memory
-	if v2 == 1 then i := address_crosshair_2_data_memory
-	load v1
-	i := pull_trigger_internal_loop
-	save v1
-	if v2 == 0 then	i := apply_on_axis_flipped_memory
-	if v2 == 1 then i := apply_on_axis_main_memory
-	load v1
-	i := pull_trigger_internal_loop_apply_memory
-	save v1
-
-	increase_sweeps
-	
-	# Load up the on subpixels and onaxis value for crosshair 1
-	i := crosshair_1_subpixels
-	load v1
-
-	# v0 = subpx of crosshair 1
-	# v1 = on axis of crosshai r1
-
-	# We could Copy subpixels into subpixel accumulating register
-	# But we might not be starting from here.
-	# So we don't
-	# v2 := v0
-	# v1 is our current on axis
-
-	# So load up just this value from crosshair 2:
-	i := crosshair_2_onaxis
-	load v0
-	# Add the two onaxis values together
-	v1 += v0
-
-	# Save to a register
-	v6 := v1
-	# And fix the remaining offset:
-	v6 += -1
-
-	# Load up the normalised rotation:
-	i := rotation_normalised
-	load v0
-
-	# Look up the memory location for subpixels per frame:
-	i := long tan_table
-	# Step in by rotation
-	i += v0
-	# Load it up
-	load v0
-	# Store it for later!
-	subpx_step := v0
-
-	# Now, since we actually want every pixel between the two locations
-	# It's more code efficient to actually math it out rather than use our tables
-
-	vE := 0
-	
-	i := 0x180
-	save vF
-
-		# Our loop here:
-		# v0 = cross_x
-		# v1 = cross_y
-		# v2 = subpixel accumulator
-		# v3 = on_axis
-		# v4 = off_axis
-		# v5 = subpx_step
-		# v6 = distance_countdown
-		# v7 = check for collisions with player sweep
-		# v8 = end condition
-		# vE = Allows for the delay of frames
-
-	# Track points with this:
-	Tx := 0
-	# Starting points should be the current number of sweeps:
-	i := long sweeps_this_level
-	# Let's get XO chip finally
-	load Tr - Tr
-	vF := 10
-	Tr =- vF
-
-	# Draw the line
-	# in theory if we hit something we're not supposed to, we need to crash out
-	v7 := 1
-	v8 := 0
-
-	pull_trigger_internal_loop
-	if v7 == 2 begin
-		# if we hit something bad, we have to undraw the line we drew, and skip 
-		# collision testing
-		jump line_abort_point
-	end
-	
-	
-	q_delay
-
-	# We now juse the graphics planes to avoid having to undraw all the enemies by just only drawing them
-	# into the plane 2 where the line currently resides
-	# We have to remove all enemies first and test them individually against the line
-	# Turn off collisions:
-	#v5 := 0
-	# Remove them all:
-	#sweep_enemies
-	#sweep_trash
-	
-	# Activate collision detection
-	v5 := 1
-	# Test one at a time (as part of v5 being on)
-	sweep_trash
-	if Tx == 0 then Tr := 0
-	sweep_enemies
-
-
-	plane 1
-	draw_score
-	i := long score_this_level
-	load v0
-	v0 += Tx
-	i := long score_this_level
-	save v0
-	draw_score
-
-	# if v7 is 0 then we got all the trash:
-	if v7 == 0 begin
-		#:breakpoint level_complete
-		# Get the level we loaded:
-
-		v0 := 4
-		v1 := 2
-		loop
-			buzzer := v1
-			vF := 10
-			f_delay
-			v0 -= 1
-			if v0 != 0 then
-		again
-
-		v0 := key
-
-		i := load_level_number
-		# We must have completed this level
-		load vA - vA
-		# vA := v0
-
-		i := long level_select_last
-		load v3
-		# v0: current level
-		# v1: total levels unlocked
-		# v2: total levels competed
-		# v3: current chapter
-
-		vA += 1
-		v2 := vA
-		vA += 1
-		v1 := vA
-
-		i := long level_select_last
-		save v3
-
-		jump game_restart
-	end
-
-	# turn off collision check
-	#v5 := 0
-	# And restore the enemies:
-	#sweep_enemies
-	#sweep_trash
-
-
-	: line_abort_point
-	# Then undraw the line:
-	i := 0x180
-	# restore how many pixels to draw
-	load v6
-	v7 := 0
-	if v8 != v6 then pull_trigger_internal_loop
-
-	i := 0x180
-	load vF
-	plane 1
-
-	jump trigger_return
-	
-: trigger_quick_mem
- 0 0
-
- : sweep_trash
- 	# use v6 to count in 3s
- 	v6 := 0
- 	# Use v5 to count linearly now:
- 	v5 := 0
- 	#plane 1
-
- 	# We can also use v7 at this time:
-
- 	v7 := 0
-
- 	#if v5 == 1 then 
- 	plane 2
- 	loop
-	 	i := long quick_trash
-	 	i += v6
-	 	load v2
-
-	 	if v2 == -1 then jump skip_trash_sweep
-
-	 	# At least 1 item of trash remains
-	 	v7 += 1
-
-	 	i := long furniture
-	 	i += v2
-	 	sprite v0 v1 8
-
-	 	#if v5 != 0 begin
-	 		vE := vF
-			sprite v0 v1 8
-	 		if vE != 0 begin
-
-	 			v7 += -1
-				plane 1
-				sprite v0 v1 8
-				
-				Tx += Tr
-				if Tr != 0 then Tr += 1
-
-				v2 := v5
-				calc_trash_ui_pos
-
-				v0 -= 1
-				v1 -= 1 
-				
-				i := long trash_get
-				#sprite v0 v1 0
-				plane 2
-				sprite v0 v1 0
-
-	 			i := long level_reset_data
-	 			load v2
-	 			i := long quick_trash
-	 			i += v6
-	 			save v2
-	 		end
-	 	#end
-
-	 	: skip_trash_sweep
- 		v6 += 3
- 		v5 += 1
-
- 		if v6 != 27 then
- 	again
-
- ;
-
-: sweep_enemies
-	v6 := 0
-
-	#plane 1
-	#if v5 == 1 then
-	plane 2
-
-	loop
-		i := long enemy_fast_redraw
-		i += v6
-		load v3
-
-		if v3 == -1 then jump trigger_skip_empty_mob
-		i := long brushable_mobs
-		i += v2
-
-		sprite v0 v1 8
-		# Test vF here perhaps
-		#if v5 == 1 begin
-			vE := vF
-			sprite v0 v1 8
-			if vE == 0 begin
-				# This enemy did not touch our line, we can undraw it to stop testing
-				jump trigger_skip_empty_mob
-			end
-
-			Tx += Tr
-			if Tr != 0 then Tr += 1
-
-			plane 1
-			sprite v0 v1 8
-			plane 2
-
-			# Otherwise it does collide, specifically with our line
-			# If that happens, we could remove it from the game here
-			# That depends on us knowing that the line is good
-			# and did not collide with anything it shouldn't be allowed to
-
-			# We can use graphics planes to acheive the above perhaps
-
-			# But let's remove this enemy from the redraw list:
-			i := long enemy_fast_wipe
-			load v3
-			i := long enemy_fast_redraw
-			i += v6
-			save v3
-
-			# And also request that it be removed
-			remove_enemy
-		#end
-
-		: trigger_skip_empty_mob
-		v6 += 0x08
-		if v6 != 64 then
-	again
-;
-
-
-: pull_trigger_internal_loop	# This label is used to change
-		# Plot to the starting point:						|
-		i := crosshair_2_data	# <-------------------------- this command
-		load v2
-		cross_x += 1
-		cross_y += 1
-
-		# We know that v2 contains the subpixels achieved by the line when it hit the barrier
-		# But we are going to be counting backwards
-		# So let's just invert this value and call it good:
-
-		vF := 0xFF
-		v2 ^= vF
-		v2 += 1
-
-		plane 2
-		
-		loop
-			# We can just step on 1 pixel at a time:
-			on_axis := 1
-			off_axis := 0
-			v2 += subpx_step
-			if vf != 0 then off_axis := 1
-			# Easy 45 degree mode:
-			if subpx_step == 0xFF then off_axis := 1
-			
-			# If I wanted to reverse this, I would call the other command
-			# And start at the other coords
-			: pull_trigger_internal_loop_apply_memory
-			apply_on_axis_main
-
-			i := long line_v
-			sprite cross_x cross_y 1
-
-			if v7 == 0 then vF := 0
-
-			if vF != 0 begin
-				# We've hit something we're not allowed to
-				# We have to abort this line
-
-				on_axis := 5
-				off_axis := 4
-
-				v8 := v6
-
-				plane 3
-				loop
-					scroll-up 1
-					buzzer := off_axis
-					vF := 4
-					f_delay
-					on_axis -= 1
-					scroll-down 1
-					vF := 4
-					f_delay
-					if on_axis != 0 then
-				again
-				plane 2
-
-				sprite cross_x cross_y 1
-				v7 := 2
-				return
-			end
-
-
-			vE += 0b01000000
-			if vE == 0 begin
-				q_delay
-			end
-
-			v6 += -1
-
-			if v6 != v8 then
-		again
-
-		plane 1
-;
-
-: q_delay
-	vf := 1
-: f_delay
-	delay := vf
-	loop
-		vf := delay
-		if vf != 0 then
-	again
-;
-
-# So let's do it with actual code, at run time, because we can!
-: generate_tan_table
-	# I want to generate a table of
-	# whole px, subpx for each distance value, per angle
-	# Max distance is 8 * 7, so let's assume ~63 for easy data stride
-	# Angle is from (in principal) 0 to in principal (45)
-	# But we start with 1 because 0 is... all 0s
-
-	Tr := 1
-
-	# So, this code runs over the whole rotation space and yields the off_axis value for an on_axis displacement
-	# We have a 2nd table, which works in the reverse - the maximum on_axis displacement for a given off_axis (per rotation)
-	# We also want access to the remainder subpixels for a given on axis displacement.
-	# This allows us to pull subpixels per step from tan_table and still know where to start,
-	# when drawing a line, as we define our starting point as a vague point on the line
-	# (to allow for simple player control that feels good)
-	# Either I can work this out on hit, or, I can form a table
-	# This code here is able to generate table 1 and table 3,
-	# but the process of having the correct final result for the subpixels is muddied
-	# You only need this when you try to draw a line, so it's just making the 
-	# hot loop slower to ensure we have these to handy
-	# So, how can we change this code so that it generates the subpixel table separately?
-
-	loop
-		# Pull our incrimental subpixel value for this rotation:
-		i := long tan_table
-		i += Tr
-		load v0
-
-		# I have a problem.
-		# I want to self modify this code:
-		: tangen_address_base
-		i := long quick_tan_table
-		:calc code_tangen_address { tangen_address_base + 2 }
-		# fortunately we modify this AFTER we have already used it, later in this loop
-		# Otherwise I can't use calc?
-
-		:monitor tangen_address_base 8
-
-		# Register set up per pass:
-		# Initial sub pixels:
-		v1 := 0x80 
-		v3 := 0
-		# Copy subpixels to another, safe register:
-		subpx_step := v0 # v5 will be subpix per step
-		v0 := 0  # v0 will be total displacement
-
-		# We will have I pointing at the correct location of this extended tan data
-		# We save the 0 value to prevent complicated maths. Same reason we start with r 0
-
-		loop
-			# We will change this to v1 for a 2nd pass:
-			:next generate_tan_table_value_retain
-			#v0 := v2
-			# Save current data (and step on)
-			save v1
-
-			# Incriment subpixels:
-			v1 += subpx_step
-			# If this overflows, we increase displacement in v0
-			if vf != 0 then v0 += 1
-
-			# v3 counts up:
-			v3 += 1
-			# Do this 63 times:
-			if v3 != 64 then
-		again
-
-		i := code_tangen_address
-		load v1
-
-		# We now have the memory address of the data for quick_tan_table + r * 64 in our v0 and v1
-		# Turns out we want that in our quicktan table:
-		: generate_tan_table_lookup_base_address
-		i := long quick_tan
-
-		# Set vD to 180 for subpixel table
-		i += vD
-
-		# Incriment I by 2x Tr
-		i += Tr
-		i += Tr
-		save v1
-		
-		# Then work out the next address:
-		v2 := 0x80 # Data is 128 bytes each:
-		v1 += v2
-		if vf != 0 then v0 += 1
-
-		# Then we save that into our next pass's I command so we work out the next piece of data
-		i := code_tangen_address
-		save v1
-
-		# Step forward I:
-		Tr += 1
-
-		# OK I now have a mad table
-
-		if Tr != 45 then
-	again
-;
-
-
-	
-
-: generate_offaxis_max_table
-	# So, we also want a table that allows us to figure out the maximum value 
-	# of an on_axis line if the off_axis has to be clamped to some lower value
-	# We could either search through the displacement data (eg as a binary search)
-	# or we can create a table that gives us the answer
-
-	Tr := 1
-
-	# Steal the last valid good memory address from the other function:
-	i := code_tangen_address
-	load v1
-	i := offaxis_gen_memory_target
-	save v1
-
-	# We could use our existing table to work this out but it's actually slightly
-	# easier to work from scratch
-	# typical offset is quick_tan_table + 5632
-	loop
-		i := long tan_table
-		i += Tr
-		load v0
-		subpx_step := v0
-
-		# v0 as on_axis will be the maximum value that we can count to before we overflow to the next pixel.
-		v0 := 0
-		# off axis:
-		off_axis := 0
-
-		# This time, subpixels will be 0:
-		v2 := 0x00
-		
-		# We will use the overflow to indicate when we've found the next 
-
-		# i := long
-		0xF0 00
-		: offaxis_gen_memory_target
-		00 00
-
-		# if you want to go 0 px off axis, you can go... 0?
-		save v0
-
-		loop
-			v0 += 1
-			v2 += subpx_step
-			if vF != 0 begin
-				# the current value of on axis is the maximum value for this off axis
-				save v0
-				# i will step on by off_axis amount
-				off_axis += 1
-				end
-
-
-			if v0 != 63 then
-		again
-
-		save v0
-		off_axis += 1
-
-		v0 := 0xFF
-		save v0
-		off_axis += 1
-
-		i := offaxis_gen_memory_target
-		load v1
-
-		# update the table, I guesss!!!
-
-		i := long quick_off_axis
-		i += Tr
-		i += Tr
-		save v1
-
-		v1 += off_axis
-		v0 += vF
-		i := offaxis_gen_memory_target
-		save v1
-
-		Tr += 1
-		
-		if Tr == 45 begin
-			# the next memory address is set up correctly
-			i := final_off_axis_save
-			save v1
-			
-			i := long quick_off_axis
-			i += Tr
-			i += Tr
-			save v1
-		
-			
-			0xF0 00
-			: final_off_axis_save
-			0 0 
-			
-			v0 := 0
-			v1 := 1
-			v2 := 2
-			
-			save v1
-			
-		end
-
-		if Tr != 45 then
-	again
-	
-	# We also want a 1 pixel deep final value for 45 degrees
-	
-	
-
-;
-
-: service_enemy
-	# v0 is the current value of frame cycle
-	# which atm is a value of 0b????0000
-
-	# v0 := Current movement type    --------- (gets moved elsewhere)
-	# v1 := Current movement subframe --------- (gets moved elsewhere)
-	# v2 := mob_frame : Current animation Frame
-	# ------------ Easy Save separation
-	# v3 := mob_x : Grid X position
-	# v4 := mob_y : Grid Y position
-	# v5 := mob_type : Type of enemy, useful for working out graphic and movement type
-	# v6 := movement index
-	# v7 := 
-	# ------------------
-	# v8 := infinite loop protection when deciding next movement type
-	# v9 := movement subframe relocate
-	# vA := mob movement type
-	# vB mob_data_spacing
-	# vC mob_draw_y
-	# vD mob_draw_x
-	# vE 
-
-	:alias mob_frame v2
-	:alias mob_x v3
-	:alias mob_y v4
-	# 8 bytes per mob
-	:alias mob_type v5
-	:alias mob_movement_index v6
-	:alias mob_speeder v7
-
-	:alias mob_infinite_loop_protection v8
-	:alias mob_movement_type vA
-	:alias mob_movement_subframe v9
-
-	:alias mob_data_spacing vB
-	:alias mob_draw_x vD
-	:alias mob_draw_y vC
-
-	i := frame_cycle_count
-	load v0
-
-	i := long enemy_list
-	i += v0
-	# Keep this for a hot minute in case we need it:
-	vE := v0
-	load enemy_data_size
-
-	# This will load our enemy into our registers v0 to v7?
-
-	# If there's no mob here, we skip:
-	if mob_type == -1 then jump maybe_create_enemy
-	# We need to get the display position of this mob:
-: enemy_created
-	# Backup our registers
-	i := 0x180
-	save vF
-
-	# Copy our data over to our retaining registers:
-	mob_movement_type := v0
-	mob_movement_subframe := v1
-
-	# Step A: Load up the X/Y coords into mob_x mob_y
-
-	# Now because we save the enemy position we don't need to do this:
-	# calc_mob_draw_xy
-
-
-	# mob_type is now a 0x8 strided list
-	# load up the sprite spacing for this sprite:
-	# i := mob_spacing
-	# i += mob_type
-	# load v0
-	# mob_data_spacing := v0
-
-	# If the mob frame is -1, then it's the first time it's ever been drawn
-	# In this case we don't need to undraw it:
-	if mob_frame == -1 begin
-		mob_frame := 0
-		mob_movement_subframe := 16
-		jump mob_skip_undraw
-	end
-
-	# Step B: we also need to know the enemy's last displacement:
-	# This uses movement_type and movement_subframe to load up the offsets
-	# into v0 and v1
-	# then we add in the base draw position of this enemy:
-
-	# We can do this:
-	#load_movement_subdata
-	#v0 += mob_draw_x
-	#v1 += mob_draw_y
-	# But instead we can do this:
-	i := long enemy_fast_redraw
-	i += vE
-	load v1
-	# We could load v2 and get the below offset, but we already have it:
-
-	# Point I at the sprite:
-	i := long brushable_mobs
-	i += mob_type
-	i += mob_frame
-
-	# Undraw the enemy:
-	sprite v0 v1 8
-
-	# Iterate the frame every time we process this enemy, so that
-	# it always does a little dance
-	# conviniently, the sprites are strided by 0x80
-	mob_frame += 0x80
-
-	# And move it only half the time.
-	# it would be cool if we could make some mobs move faster or slower:
-
-	mob_speeder -= 1
-
-	:const mob_speed_offset 0
-
-	if mob_speeder == 0 begin
-		i := long default_mob_datas
-		i += mob_type
-		v0 := mob_speed_offset
-		load v0
-		mob_speeder := v0
-		mob_movement_subframe += 2
-	end
-	
-	# Cycle the mob frame
-
-
-	if mob_movement_subframe == 16 begin
-		# We have completed our movement.
-		# We marked our new cell as ours when we started moving.
-		# So we must clear our current cell:
-
-		# If it's a type of movement that actually moves:
-		if mob_movement_type != 0 begin
-			v0 := mob_x
-			v1 := mob_y
-			address_game_cell
-			i := long game_grid
-			i += v1
-			v0 := -1
-			save v0
-			
-			# Get single digit translation:
-			mob_movement_subframe := 0
-			# We pick the subframe assoicated with 1 px offset
-			# But instead apply that to the grid:
-			load_movement_subdata
-			mob_x += v0
-			mob_y += v1
-			# New position marked
-		end
-
-		: mob_skip_undraw
-		# We should progress to the next part of their movement at this time
-
-		mob_infinite_loop_protection := 0
-		# We need to apply the kind of movement that we hoped to achieve
-		: mob_movement_jumpback
-		mob_infinite_loop_protection += 1
-		if mob_infinite_loop_protection == 6 then jump mob_loop_fail
-		# We need to defend against infinite loops at this time
-		if mob_movement_index == 16 then mob_movement_index := 0
-		# mob movement index is the reference from the start of this mob's movement pattern that we're at
-		i := long enemy_behaviors
-		i += mob_type
-		i += mob_type
-		i += mob_movement_index
-		# There are up to 16 kinds of thing that move with this system
-		# Each type of movement has 16 bytes available to it
-		# Load 2 bytes associated with movement
-		load v1
-
-		# If we've reached the end:
-		# Go back to the start
-		if v0 == -1 begin
-			mob_movement_index := 0
-			jump mob_movement_jumpback
-		end
-
-		# We just loaded from memory
-		# v0 is our new movement type
-		# v1 is our conditional
-
-		# we need to do some math thinking stuff here
-		# so we're going to need v0 and v1 shipped somewhere else
-		mob_movement_type := v0
-		vE := v1
-
-		if mob_movement_type == -2 begin
-			mob_movement_type := random 0b00110000
-			mob_movement_type += 16
-		end
-
-		# A non 0 movement type is obviously acceptable:
-		if mob_movement_type == 0 then jump movement_auto_valid
-
-		# we need to look up the cell associated with this new position:
-		mob_movement_subframe := 0
-		load_movement_subdata
-		v0 += mob_x
-		v1 += mob_y
-		address_game_cell
-
-		# v0 : cell data
-		# v1 : cell address
-
-		# If v0 is -1, then it's fine
-
-		# if v0 is NOT -1, then, we can't move right now
-		if v0 != -1 begin
-			# What we do now depends on the value of vE
-			# Progression rules:
-			# We also have conditionals
-			# 0: Progress regardless
-			# 1: Repeat until impossible
-			# 2: Retry until successful
-
-			# Progress anyway
-			if vE == 0 begin
-				# Just defer movement type to 0:
-				: mob_loop_fail
-				# This prevents us from experiencing another result:
-				vE := 0
-				mob_movement_type := 0
-				mob_movement_index += 2
-			end
-
-			# This movement is impossible, so we should actually progress to the next movement
-			if vE == 1 begin
-				# We want to progress on a step:
-				mob_movement_index += 2
-				# This can create an infinite loop if the enemy is unable to progress in any direction:
-				jump mob_movement_jumpback
-			end
-
-			if vE == 2 begin
-				# We want to do nothing for this frame, but not progress:
-				mob_movement_type := 0
-				# If we can't move because it's a bad coord, we'll never succeed!!
-				# So progress anyway:
-				if v0 == -2 then mob_movement_index += 2
-			end
-		end
-
-		if v0 == -1 begin
-			# Load up this enemy ID:
-			i := frame_cycle_count
-			load v0
-			# Target the game_grid and save our ID into it:
-			i := long game_grid
-			i += v1
-			save v0
-
-			: movement_auto_valid
-			# If we can move into this location
-			# Then v1 = 0 == progress
-			#      v1 = 1 == don't progress yet
-			#      v1 = 2 == progress
-			if vE != 1 then mob_movement_index += 2
-		end
-
-		# we need to save the whole enemy in this case
-
-		mob_movement_subframe := 0
-	end
-
-	calc_mob_draw_xy
-	load_movement_subdata
-	# Re index to sprite frame:
-
-	v0 += mob_draw_x
-	v1 += mob_draw_y
-
-	# Take a copy of exactly where we drew this enemy on the screen:
-	i := temp_e_data_b
-	save v1
-
-	i := long brushable_mobs
-	i += mob_type
-	i += mob_frame
-
-	# This is the exact position of where the mob is drawn
-	sprite v0 v1 8
-
-	# Right now, v0 and v1 contain the information I want about the sprite position
-	# mob_type + mob_frame consitute a < 256 byte offset to the graphic
-
-	i := frame_cycle_count
-	load v0
-	i := long enemy_list
-	i += v0
-
-	# Keep the offset somewhere
-	vE := v0
-
-	# Save our updated enemy data
-	# We move this data back into the save memory region:
-	v0 := mob_movement_type
-	v1 := mob_movement_subframe
-	save enemy_data_size
-
-
-	# Load up the X Y draw positions:
-	i := temp_e_data_b
-	load v1
-	# For the purposes of collsion, we want to quickly undraw this enemy
-	# Let's save the X Y position into a list
-	# Note that mob_frame IS v2
-	v2 += mob_type
-	v3 := mob_type
-
-	# Generate fast redraw info
-	i := long enemy_fast_redraw
-	i += vE
-	save v3
-
-	# Restore our regular gameplay registers:
-	i := 0x180
-	load vF
-;
-
-: temp_e_data_b
- 0 0
-
-
-: calc_mob_draw_xy
-	i := long grid_xy
-	i += mob_x
-	load v0
-	mob_draw_x := v0
-
-	i := long grid_xy
-	i += mob_y
-	load v0
-	mob_draw_y := v0
-
-	# Translate over to the start of the grid:
-	mob_draw_x += UL_X_plus1
-	mob_draw_y += UL_Y_plus1
-;
-
-: load_movement_subdata
-	v0 := 0
-	v1 := 0
-
-	if mob_movement_type == 0 then return
-	# movement patterns are strided by 8 pairs of bytes
-	i := long movement_patterns
-	# we should store the direct access value in this register:
-	i += mob_movement_type
-	i += mob_movement_subframe
-	# load the two small offsets
-	load v1
-;
-
-: last_enemy
- -8
-
-: maybe_create_enemy
-	# vF contains the current enemy slot that is empty
-	# I guess I should load an enemy from our hypothetical list of enemies:
-
-	i := last_enemy
-	load v0
-
-	v0 += 8
-	if v0 == 128 then v0 := 0
-
-	vF := random 0b00001111
-	if vF != 0 then return
-
-	i := last_enemy
-	save v0
-
-	v2 := v0
-
-	# enemy type is a multiple of 8
-	v3 := 0
-	# It also is where the current movement step is stored so it has to exist
-
-	# I guess maybe we have to loop this till we find an empty space?
-	# Note that this should be a multiple of 16 in order to work
-	: retry_get_empty_position
-	i := long random_mob_position
-	load v0
-	v0 += 2
-	if v0 == 200 then v0 := 0
-	i := long random_mob_position
-	save v0
-	i += v0
-	load v1
-	# next X Y coords loaded into v0 v1
-	# Set the enemy to these coords
-	i := long enemy_template_save_target
-	save v3
-
-	# Check this cell is actaully available:
-	address_game_cell 
-	# If not:
-	if v0 != -1 then jump retry_get_empty_position
-
-	# If yes:
-	# Register this enemy to this location:
-
-	i := long game_grid
-	i += v1
-	v0 := vE
-	save v0
-
-	i := long enemy_template
-	load v7
-
-	i := long enemy_list
-	i += vE
-	save v7
-	# We can now relocate enemy_template v7 to the new memory location
-
-	jump enemy_created
-;
-
-: remove_enemy
-	# v6 contains the enemy to remove as x8
-	i := long enemy_list
-	i += v6
-
-	# This enemy should be defaulted out
-	v0 := 5
-	i += v0
-	v0 := -1
-	save v0
-
-	# additionally, there may be cells associated with it in game_grid
-	# These need to be cleared out
-
-	v1 := 0
-	i := long game_grid
-	loop
-		load v0
-
-		if v0 == v6 begin
-			i := long game_grid
-			i += v1
-			v0 := -1
-			save v0
-		end
-		v1 += 1
-		if v1 != 49 then
-	again
-;
-
-
-
-: address_game_cell
-	# v0 := X pos
-	# v1 := Y pos
-	if v0 == 255 then jump bad_coord
-	if v0 == 7 then jump bad_coord
-	if v1 == 255 then jump bad_coord
-	if v1 == 7 then jump bad_coord
-
-	i := long game_grid_stride
-	i += v1
-	v1 := v0
-	load v0
-	v1 += v0
-	i := long game_grid
-	i += v1
-	load v0
-;
-: bad_coord
-	v0 := -2
-	# v0 now has the value of this cell in it
-	# v1 now has the relative index to this cell in it
-;
-
-: draw_obstacles
-	v0 := 0
-
-	i := 0x180
-	save vF
-
-	plane 2
-
-	:alias trash_counter v7
-	:alias other_trash_counter v8
-
-	mob_y := 0
-	loop
-		mob_x := 0
-		loop
-			v0 := mob_x
-			v1 := mob_y
-			address_game_cell
-
-			# v0 will be content
-			# v1 will be offset from game_grid
-
-			if v0 != -1 begin
-				mob_type := 128
-				mob_type += v0
-				if vF == 1 begin	
-					# if the item was in the region at 128 or aboutve:
-					# We know it's the index of something special
-
-					# We probably want the x8 version of this index:
-					v2 <<= mob_type # x2
-					v2 <<= v2 # x4
-					v2 <<= v2 # x8
-
-					# NO HIT obsticles that must not be hit:
-					if mob_type < 16 begin
-						plane 2
-						# furniture
-						calc_mob_draw_xy
-						i := long furniture
-						i += v2
-
-						sprite mob_draw_x mob_draw_y 8
-						jump draw_obstacles_pass_trash
-					end
-
-					# Trash items which must be cleared:
-					if mob_type < 32 begin
-						plane 1
-						calc_mob_draw_xy
-
-						v0 := mob_draw_x
-						v1 := mob_draw_y
-						i := long quick_trash
-						i += trash_counter
-						save v2
-
-						# Draw it because that makes things simpler:
-						i := long furniture
-						i += v2
-
-						sprite mob_draw_x mob_draw_y 8
-
-						v2 := other_trash_counter
-						calc_trash_ui_pos
-						sprite v0 v1 8
-
-						trash_counter += 3
-						other_trash_counter += 1
-					end
-				end
-
-				: draw_obstacles_pass_trash
-				vF := 8
-				f_delay
-			end
-
-			mob_x += 1
-			if mob_x != 7 then
-		again
-		mob_y += 1
-		if mob_y != 7 then
-	again
-
-
-
-	plane 1
-
-	i := 0x180
-	load vF
-;
-
-: calc_trash_ui_pos
-	# v2 is trash index
-	v0 := 98
-	v1 := 8
-	if v2 == 0 then jump skip_annoying_math
-	loop
-		v0 += 9
-		:calc what_would_it_be { 98 + 3 * 9 }
-		if v0 == what_would_it_be begin
-			v1 += 9
-			v0 := 98
-		end
-		v2 -= 1
-		if v2 != 0 then
-	again
-	: skip_annoying_math
-;
-
-: load_level
-	# level is in... v0?
-
-	# This is the stupid way of loading a level
-	i := long levels_load
-	# Stride in by 4x
-	i += v0
-	i += v0
-	i += v0
-	i += v0
-	# Load v4 bytes
-	load v3
-
-	i := load_level_source_address
-	save v3
-
-
-
-
-	# we need to read 
-	v9 := 0
-	loop
-		i := long level_reset_data
-		#i += v9
-		load v6
-		i := game_grid
-		i += v9
-		save v6
-
-		v9 += 7
-		:calc g_grid_plus_trash { 49 + 4 * 7 }
-		if v9 != g_grid_plus_trash then
-	again
-	v9 := 0
-
-	loop
-		: load_level_source_address
-		i := long level_lr_1
-		i += v9
-		load v0
-
-		if v0 == -1 then jump load_level_get_enemies
-		v2 := v0
-		load v1
-		v9 += 3
-
-		# v0 v1 x y, v2 obsticles
-		address_game_cell
-		i := long game_grid
-		i += v1
-		v0 := v2
-		save v0
-	again
-	v9 := 0
-
-	: load_level_get_enemies
-	# Also draws trash:
-	draw_obstacles
-	v9 := 0
-;
-
-: level_select_mode
-	# Captures gameplay and allows the player to select a level
-
-	plane 3
-	clear
-	plane 1
-
-	i := long wipey_wipe
-	load vF
-
-	i := long level_select_last
-	load v3
-
-	:alias total_levels_unlocked v8
-	:alias total_levels_complete v9
-	:alias current_chapter vA
-	:alias current_level vB
-	# v0: current level
-	# v1: total levels unlocked
-	# v2: total levels competed
-	# v3: current chapter
-	current_level := v0
-	total_levels_unlocked := v1
-	total_levels_complete := v2
-	current_chapter := v3
-
-	i := long mul_8
-	i += current_chapter
-	load v0
-
-	# We now know where to index into chapters
-
-	:alias chapter_offset v7
-	chapter_offset := v0
-
-	v6 := 0
-
-	# First, draw the layout:
-	mob_draw_x := 0
-	mob_draw_y := 1
-
-	:alias completed_levels_drawn v4
-	:alias highest_current_level v5
-	completed_levels_drawn := 0
-	highest_current_level := 0
-	loop
-		i := long chapters
-		i += chapter_offset
-		i += v6
-
-		load v0
-		# What are we looking at here:
-		if v0 == -1 begin
-			mob_draw_x += 4
-			i := long level_select_marker_first
-			sprite mob_draw_x mob_draw_y  8
-			mob_draw_x += 8
-			jump lv_select_end_loop
-		end
-
-		if v0 >= 0x80 begin
-			if v6 == 7 begin
-				if completed_levels_drawn != 6 then	jump lv_select_end_loop
-			end
-			i := long padded_line_h
-			sprite mob_draw_x mob_draw_y 4
-			mob_draw_x += 8
-			i := long level_select_marker_next
-			sprite mob_draw_x mob_draw_y  8
-			mob_draw_x += 8
-		end
-
-		if v0 < total_levels_unlocked begin
-			# This level is completed
-			i := long padded_line_h
-			sprite mob_draw_x mob_draw_y 4
-			mob_draw_x += 8
-			i := long level_select_marker
-			sprite mob_draw_x mob_draw_y  8
-
-			if v0 < total_levels_complete begin
-				completed_levels_drawn += 1
-				i := long level_select_complete
-				sprite mob_draw_x mob_draw_y  8
-			end
-
-			mob_draw_x += 8
-		end
-
-		highest_current_level := v6
-
-		: lv_select_end_loop
-		v6 += 1
-		if v6 != 8 then
-	again
-
-	highest_current_level += 1
-
-	: level_select_move_select_arrow
-	# Actual select loop:
-	# Use current 0 - 8 to select what we're looking at:
-	i := long mul_8
-	i += current_level
-	load v0
-	v0 += v0
-	v0 += 4
-	mob_draw_x := v0
-	mob_draw_y := 9
-	i := long level_select_pointer
-	sprite mob_draw_x mob_draw_y  8
-
-	#current_level
-
-	: level_select_reject_input
-	i := long level_select_pointer
-	v0 := key
-
-	if v0 == 7 begin
-		sprite mob_draw_x mob_draw_y  8
-		# Left
-		current_level += -1
-		if current_level == -1 then current_level := 0
-
-		jump level_select_move_select_arrow
-	end
-	if v0 == 9 begin
-		sprite mob_draw_x mob_draw_y  8
-		# Right
-		current_level += 1
-
-		i := long chapters
-		i += chapter_offset
-		i += current_level
-		load v0
-
-		if v0 == total_levels_unlocked then current_level -= 1
-
-		if current_level == highest_current_level then current_level -= 1
-
-		if current_level == 8 then current_level := 7
-
-
-		jump level_select_move_select_arrow
-	end
-	if v0 == 0xE begin
-		# F
-		i := chapters
-		i += chapter_offset
-		i += current_level
-		load v0
-
-		if v0 == -1 then jump level_select_reject_input
-
-		# Change chapter
-		if v0 >= 0x80 begin
-			v0 -= 0x80
-			current_chapter := v0
-
-			if current_level == 0 then current_level := 6
-			if current_level == 7 then current_level := 1
-			v0 := current_level
-			v1 := total_levels_unlocked
-			v2 := total_levels_complete
-			v3 := current_chapter
-
-			i := long level_select_last
-			save v3
-			jump level_select_mode
-		end
-
-		# Otherwise we select this level:
-
-		v1 := v0
-
-		i := long level_select_last
-		v0 := current_level
-		save v0
-
-		v0 := v1
-
-		return
-	end
-	jump level_select_reject_input
-
-: reset_sweeps
-	v0 := 0
-	i := long sweeps_this_level
-	save v0
-	i := long score_this_level
-	save v0
-
-	draw_sweeps
-	draw_score
-;
-
-: increase_sweeps
-	
-	i := long sweeps_this_level
-	load v0
-	v3 := v0
-	draw_sweeps
-	v0 := v3
-	v0 += 1
-	if v0 == 11 then v0 := 10
-	i := long sweeps_this_level
-	save v0
-
-	draw_sweeps
-;
-
-: draw_sweeps
-	v1 := 28
-	v2 := 56
-	q_dig
-;
-
-: draw_score
-	i := long score_this_level
-	load v0
-
-	i := 0x170
-	bcd v0
-
-	load v0
-	v1 := 108
-	v2 := 56
-	q_dig
-
-	i := 0x171
-	load v0
-	v1 += 6
-	q_dig
-
-	i := 0x172
-	load v0
-	v1 += 6
-	q_dig
-
-	:monitor 0x170 3
-;
-
-: q_dig
-	i := mul_5
-	i += v0
-	load v0
-	i := long fivewide_digits
-	i += v0
-	sprite v1 v2 5
-;
-
-
-
-
+##############################
+# So I have had to impliment to-data, and to-code in order to continue working on this project
+# I really genuinely dislike this
+# How I've implimented it currently is that, literally all the DATA is at the head of the file now:
+# And all the code is afterwards
 
 ###############################
-#
-# EZ-Writer implimentation
-#
-###############################
-# Options used:
-# Support for X/Y control char
-# Using fivewide fixed width font
-# Using pre calculated offset so just need to add offset to font address
+## Data I didn't get to yet
 
-:const STR_END    0xFF
-:const STR_POS    0xFE
-:const STR_SPACE  0xF9
-:const CHAR_WIDTH  6
-:const CHAR_HEIGHT 5
-
-:alias string-offset v3
-:alias cursor-x      v4
-:alias cursor-y      v5
-
-: print-char
-	if v0 == STR_POS begin
-		string-offset += 2
-		cursor-x := v1
-		cursor-y := v2
-		return
-	end
-	if v0 != STR_SPACE begin
-		i  := long font
-		# Only need x1 due to x5 already factored in
-		i  += v0
-		sprite cursor-x cursor-y CHAR_HEIGHT
-	end
-	cursor-x += CHAR_WIDTH
-;
-: print-string
-	# stash registers here if you need to protect up to v5
-	i := print-string-read
-	save v1
-	string-offset := 0
-	cursor-x      := 0
-	cursor-y      := 0
-	loop
-		# this is equivalent to "i := long NNNN"
-		# where NNNN is re-written outside the loop.
-		# to avoid using XO-CHIP instructions,
-		# you could instead use :unpack to
-		# produce an indirect pointer-
-		# see the Octo manual for detals:
-		0xF0 0x00 : print-string-read 0x00 0x00
-		i += string-offset
-		load v2
-		while v0 != STR_END
-		string-offset += 1
-		print-char
-	again
-	# And restoring strings here if needed
-;
-
-# Detoured to front of program:
-#:macro print ADDRESS {
-	#:calc hi { 0xFF & ADDRESS >> 8 }
-	#:calc lo { 0xFF & ADDRESS }
-	#v0 := hi
-	#v1 := lo
-	#print-string
-#}
-
-
-# Ideally these will live in low memory
-: crosshair_a
-0b10100000
-0b00000000
-0b10100000
-
-: crosshair_b
-0b11100000
-0b11100000
-0b11100000
-
-:calc FREE { 4096 - HERE }
-: FREE_CODE_BYTES
-:byte { FREE >> 8 }
-:byte { FREE }
-:monitor FREE_CODE_BYTES "%2i"
-
-: font
-: fivewide_full_font # space first:
-	0x20 0x50 0x88 0xF8 0x88 # a
-	0xF0 0x88 0xF0 0x88 0xF0 # b
-	0x78 0x80 0x80 0x80 0x78 # c
-	0xF0 0x88 0x88 0x88 0xF0 # d
-	0xF8 0x80 0xF0 0x80 0xF8 # e
-	0xF8 0x80 0xF0 0x80 0x80 # f
-	0x78 0x80 0x98 0x88 0x70 # g
-	0x88 0x88 0xF8 0x88 0x88 # h
-	0xF8 0x20 0x20 0x20 0xF8 # i
-	0xF8 0x20 0x20 0x20 0xE0 # j
-	0x88 0x90 0xE0 0x90 0x88 # k
-	0x80 0x80 0x80 0x80 0xF8 # l
-	0x88 0xD8 0xA8 0x88 0x88 # m
-	0x88 0xC8 0xA8 0x98 0x88 # n
-	0x70 0x88 0x88 0x88 0x70 # o
-	0xF0 0x88 0xF0 0x80 0x80 # p
-	0x70 0x88 0x88 0x98 0x78 # q
-	0xF0 0x88 0xF0 0x90 0x88 # r
-	0x78 0x80 0x70 0x08 0xF0 # s
-	0xF8 0x20 0x20 0x20 0x20 # t
-	0x88 0x88 0x88 0x88 0x70 # u
-	0x88 0x88 0x50 0x50 0x20 # v
-	0x88 0x88 0xA8 0xA8 0x50 # w
-	0x88 0x50 0x20 0x50 0x88 # x
-	0x88 0x50 0x20 0x40 0x80 # y
-	0xF8 0x10 0x20 0x40 0xF8 # z
-: fivewide_digits
-	0x70 0x88 0x88 0x88 0x70 # 0
-	0x20 0x60 0x20 0x20 0xF8 # 1
-	0x70 0x88 0x30 0x40 0xF8 # 2
-	0xF0 0x08 0x70 0x08 0xF0 # 3
-	0x30 0x50 0x90 0xF8 0x10 # 4
-	0xF8 0x80 0xF0 0x08 0xF0 # 5
-	0x70 0x80 0xF0 0x88 0x70 # 6
-	0xF8 0x08 0x08 0x10 0x10 # 7
-	0x70 0x88 0x70 0x88 0x70 # 8
-	0x78 0x88 0xF8 0x08 0x08 # 9
-	0x00 0x00 0x00 0x00 0x20 # .
-	0x50 0x50 0x50 0x00 0x50 # !
-	0x70 0x88 0x30 0x00 0x20 # ?
-	0x00 0x00 0x00 0x20 0x60 # ,
-	0x20 0x20 0x00 0x00 0x00 # '
-	0x00 0x00 0x70 0x00 0x00 # -
-	0x50 0x50 0x00 0x00 0x00 # "
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
-
-
-: just_want_to_draw_the_damn_text
- i := long title_screen_text
+to-data
 
 : title_screen_text
 0xFE 0x11 0x09 0x41 0x1E 0x37 0x14 0xF9 0x46 0x19 0xFE 0x23 0x18 0x14 0x00 0x5F
@@ -2634,14 +257,12 @@ a_level_save 11 4
 
 : level_reset_data
 -1		-1		-1		-1		-1		-1		-1
-#-1		-1		-1		-1		-1		-1		-1
-#-1		-1		-1		-1		-1		-1		-1
-#-1		-1		-1		-1		-1		-1		-1
-#-1		-1		-1		-1		-1		-1		-1
-#-1		-1		-1		-1		-1		-1		-1
-#-1		-1		-1		-1		-1		-1		-1
 
-:macro ob x { :byte { 0x80 + x } }
+:macro ob v X Y { 
+	:byte { 0x80 + v } 
+	:byte { Y }
+	:byte { X }
+}
 #	o_cat		0
 #	o_bucket	1
 #	o_chair_a	2
@@ -2659,7 +280,11 @@ a_level_save 11 4
 #	o_stand		14
 #	o_book_b	15
 
-:macro tr x { :byte { 0x90 + x } }
+:macro tr v X Y {
+	:byte { 0x90 + v }
+	:byte { Y }
+	:byte { X }
+}
 # t_muck1 0
 # t_muck2 1
 # t_muck3 2
@@ -3254,9 +879,2529 @@ mpat_8  1 -1
 :monitor register_dump 16
 :monitor game_grid 49
 
+###############################
+#
+# Data Sprite
+#
+###############################
+# The idea of this is to be able to put X, Y, and sprite address info in
+# memory and just say 'draw sprite 1', for any incidental sprites throughout
+# the game.
+
+: fixed_graphic_angle_a
+0x04 0x00 0x04 0x00 0x08 0x00 0x08 0x00 0x10 0x00 0x1C 0x00 0x23 0x00 0x20 0x80
+0x40 0x80 0x40 0x40 0x80 0x40 0xFF 0xE0 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+: fixed_graphic_angle_d
+0xF8 0x00 0x84 0x00 0xB2 0x00 0xAA 0x00 0xAA 0x00 0xAA 0x00 0xAA 0x00 0xAA 0x00
+0xB2 0x00 0x84 0x00 0xF8 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+
+:macro data_sprite x {
+	v0 := x
+	draw_data_sprite
+	}
+
+to-code
+: draw_data_sprite
+	# v0 will tell us what sprite to draw
+	# We will need to multiply this by 4
+	v0 <<= v0
+	v0 <<= v0
+	i := long fixed_graphic_start
+	i += v0
+	# Load v3
+	load v3
+	i := data_sprite_draw_code
+	save v1
+
+	0xF0 0x00
+	: data_sprite_draw_code
+	0x00 0x00
+	sprite v2 v3 0
+;
+
+to-data
+
+:macro fixed_graphic_def X Y ADDRESS {
+	:byte { 0xFF & ADDRESS >> 8 }
+	:byte { 0xFF & ADDRESS }
+	:byte { X }
+	:byte { Y }
+}
+
+: fixed_graphic_start
+fixed_graphic_def 6 2 fixed_graphic_angle_a
+fixed_graphic_def 27 18 fixed_graphic_angle_d
+
+
+
+###############################
+#
+# EZ-Writer implimentation
+#
+###############################
+# Options used:
+# Support for X/Y control char
+# Using fivewide fixed width font
+# Using pre calculated offset so just need to add offset to font address
+
+# We are already in the data section:
+#to-data
+
+: font
+: fivewide_full_font # space first:
+	0x20 0x50 0x88 0xF8 0x88 # a
+	0xF0 0x88 0xF0 0x88 0xF0 # b
+	0x78 0x80 0x80 0x80 0x78 # c
+	0xF0 0x88 0x88 0x88 0xF0 # d
+	0xF8 0x80 0xF0 0x80 0xF8 # e
+	0xF8 0x80 0xF0 0x80 0x80 # f
+	0x78 0x80 0x98 0x88 0x70 # g
+	0x88 0x88 0xF8 0x88 0x88 # h
+	0xF8 0x20 0x20 0x20 0xF8 # i
+	0xF8 0x20 0x20 0x20 0xE0 # j
+	0x88 0x90 0xE0 0x90 0x88 # k
+	0x80 0x80 0x80 0x80 0xF8 # l
+	0x88 0xD8 0xA8 0x88 0x88 # m
+	0x88 0xC8 0xA8 0x98 0x88 # n
+	0x70 0x88 0x88 0x88 0x70 # o
+	0xF0 0x88 0xF0 0x80 0x80 # p
+	0x70 0x88 0x88 0x98 0x78 # q
+	0xF0 0x88 0xF0 0x90 0x88 # r
+	0x78 0x80 0x70 0x08 0xF0 # s
+	0xF8 0x20 0x20 0x20 0x20 # t
+	0x88 0x88 0x88 0x88 0x70 # u
+	0x88 0x88 0x50 0x50 0x20 # v
+	0x88 0x88 0xA8 0xA8 0x50 # w
+	0x88 0x50 0x20 0x50 0x88 # x
+	0x88 0x50 0x20 0x40 0x80 # y
+	0xF8 0x10 0x20 0x40 0xF8 # z
+: fivewide_digits
+	0x70 0x88 0x88 0x88 0x70 # 0
+	0x20 0x60 0x20 0x20 0xF8 # 1
+	0x70 0x88 0x30 0x40 0xF8 # 2
+	0xF0 0x08 0x70 0x08 0xF0 # 3
+	0x30 0x50 0x90 0xF8 0x10 # 4
+	0xF8 0x80 0xF0 0x08 0xF0 # 5
+	0x70 0x80 0xF0 0x88 0x70 # 6
+	0xF8 0x08 0x08 0x10 0x10 # 7
+	0x70 0x88 0x70 0x88 0x70 # 8
+	0x78 0x88 0xF8 0x08 0x08 # 9
+	0x00 0x00 0x00 0x00 0x20 # .
+	0x50 0x50 0x50 0x00 0x50 # !
+	0x70 0x88 0x30 0x00 0x20 # ?
+	0x00 0x00 0x00 0x20 0x60 # ,
+	0x20 0x20 0x00 0x00 0x00 # '
+	0x00 0x00 0x70 0x00 0x00 # -
+	0x50 0x50 0x00 0x00 0x00 # "
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+	0x00 0x00 0x00 0x00 0x00 # undefined
+
+
+# I think this means that our 0x200 address will be poluted with this this code rather than going right into main?
+# I don't know how to check.
+
+to-code
+
+:const STR_END    0xFF
+:const STR_POS    0xFE
+:const STR_SPACE  0xF9
+:const CHAR_WIDTH  6
+:const CHAR_HEIGHT 5
+
+:alias string-offset v3
+:alias cursor-x      v4
+:alias cursor-y      v5
+
+# EZ-Writer implimentation macro:
+# Just this function alone requires the entire structure of the file to be different
+# I just don't get it.
+:macro ez_print ADDRESS {
+	:calc hi { 0xFF & ADDRESS >> 8 }
+	:calc lo { 0xFF & ADDRESS }
+	v0 := hi
+	v1 := lo
+	print-string
+}
+
+: print-char
+	if v0 == STR_POS begin
+		string-offset += 2
+		cursor-x := v1
+		cursor-y := v2
+		return
+	end
+	if v0 != STR_SPACE begin
+		i  := long font
+		# Only need x1 due to x5 already factored in
+		i  += v0
+		sprite cursor-x cursor-y CHAR_HEIGHT
+	end
+	cursor-x += CHAR_WIDTH
+;
+: print-string
+	# stash registers here if you need to protect up to v5
+	i := print-string-read
+	save v1
+	string-offset := 0
+	# Default string X/Y coords:
+	cursor-x      := 0
+	cursor-y      := 0
+	loop
+		# this is equivalent to "i := long NNNN"
+		# where NNNN is re-written outside the loop.
+		# to avoid using XO-CHIP instructions,
+		# you could instead use :unpack to
+		# produce an indirect pointer-
+		# see the Octo manual for detals:
+		0xF0 0x00 : print-string-read 0x00 0x00
+		i += string-offset
+		load v2
+		while v0 != STR_END
+		string-offset += 1
+		print-char
+	again
+	# And restoring strings here if needed
+;
+
+###############################
+#
+# Code subroutines that are only used once and have been turned into macros:
+#
+###############################
+
+#: reset_sweeps
+:macro reset_sweeps
+{
+	v0 := 0
+	i := long sweeps_this_level
+	save v0
+	i := long score_this_level
+	save v0
+
+	draw_sweeps
+	draw_score
+}
+#;
+
+
+#: draw_game_box
+:macro draw_game_box
+{
+	v0 := UL_X
+
+	v1 := UL_Y
+	v2 := LL_Y
+
+	i := long line_h
+
+	loop
+		sprite v0 v1 1
+		sprite v0 v2 1
+
+		v0 += 8
+		if v0 != UR_Max8 then
+	again
+
+	i := long line_h_2
+	sprite v0 v1 1
+	sprite v0 v2 1
+
+	
+	v0 := UL_X
+	v1 := UR_X
+	v2 := UL_Y_plus1
+
+	i := long line_v
+
+	loop
+		sprite v0 v2 8
+		sprite v1 v2 8
+
+		v2 += 8
+		if v2 != LL_Max8 then
+	again
+
+	v0 := 95
+	v1 := 1
+	i := long qtex_clean
+	qtex
+
+	v0 := 3
+	v1 := 29
+	i := long qtex_sweep
+	qtex
+
+	v0 := 3
+	v1 := 56
+	i := long qtex_rank
+	qtex
+
+	v0 := 96
+	v1 := 50
+	i := long qtex_score
+	qtex
+
+	i := long sweeper_platform_a
+	v0 := 0
+	v1 := 24
+	sprite v0 v1 1
+	i := long line_h
+	: draw_platform_repeat
+	v0 += 8
+	sprite v0 v1 1
+	if v0 != 24 then jump draw_platform_repeat
+#;
+}
+
+
+#: load_level
+:macro load_level
+{
+	# level is in... v0?
+
+	# This is the stupid way of loading a level
+	i := long levels_load
+	# Stride in by 4x because I haven't changed this to just fixed addresses yet:
+	i += v0
+	i += v0
+	i += v0
+	i += v0
+	# Load v4 bytes
+	load v3
+
+	i := load_level_source_address
+	save v3
+
+	# We reset the 'game grid' data area here
+	# Fill v0 to v6 with -1s:
+	i := long level_reset_data
+	load v6
+
+	# Wipe the game grid data out with -1s and also the 'trash' data area that follows it:
+	v9 := 0
+	i := long game_grid
+	loop
+		save v6
+		v9 += 7
+		:calc g_grid_plus_trash { 49 + 4 * 7 }
+		if v9 != g_grid_plus_trash then
+	again
+
+	# Now we target the actual level and load it into the game grid:
+	v9 := 0
+	loop
+		# Self modifying code goes here:
+		: load_level_source_address
+		i := long level_lr_1
+		i += v9
+
+		# And for some reason, load it into our registers backwards:
+		load v2 - v0
+
+		# -1 in our data here signifies we've reached the end of the level data:
+		if v2 == -1 then jump load_level_get_enemies
+
+		# Format will be that X and Y pos are in v0 and v1, by using macros to ensure our data order corresponds
+		# with the 'v2 - v0' read above.
+		# v0 v1 x y, v2, obsticle
+		# Call the address game cell function, which expects v0 X and v1 Y:
+		address_game_cell
+		# The I pointer is left at game_grid + v1
+		# i := long game_grid
+		# i += v1
+		save v2 - v2
+
+		# Step onward:
+		v9 += 3
+	again
+	v9 := 0
+
+	: load_level_get_enemies
+	# Also draws trash:
+	draw_obstacles
+	v9 := 0
+#;
+}
+
+:alias enemy_data_size v7
+:alias enemy_data_simple_save v2
+
+# We always want the quick tan table to be at 'the end' of the program defined data,
+# as this is the address used as an offset
+# for the generated tables that are generated by code
+# I can tell you right now I'm going to have to generate these and hard code them in here
+# Or figure out how to macro them, because I'll need the code space.
+to-data
 
 : quick_tan_table
  	# This will be a ~ 5kb data structure of all our data
+ 	0
+
+########################################
+###
+## The actual start of execution:
+to-code
+
+: main
+
+	# First we pick a 'seed'
+	# pick a random start point
+	v0 := random 0b01111110
+	i := long random_mob_position
+	save v0
+
+
+	# I would like to replace these functions and have the data ready to go
+	# Generate quick off_axis table
+	generate_tan_table
+	generate_offaxis_max_table
+
+	clear
+
+	ez_print title_screen_text
+
+	data_sprite 0
+	data_sprite 1
+
+	v0 := key
+
+
+	hires
+
+	# This is where we jump back to after a 'gameplay' level to
+	# Get the level select screen back and show progress etc
+	# I guess that makes this a menu redraw or whatever?
+: game_restart
+
+	# Clean out enemy variables:
+	clean_enemy_variables
+
+	# Enter the level select loop:
+	level_select_mode
+
+	reset_for_new_game_loop
+
+	# We are now in the 'gameplay loop'
+
+	# Draw the main game UI
+	draw_game_box
+	# Reset sweeps for this level:
+	reset_sweeps
+
+	# Draw the static sweeper in place until some day I make it better:
+	i := long sweeper_walk_broom
+	v0 := 8
+	v1 := 8
+	sprite v0 v1 0
+
+	# We will be drawing the UI a bit at a time here:
+	vF := 16
+	f_delay
+
+	# This is where we make use of our level number:
+	:next load_level_number
+	v0 := 0
+	load_level
+	
+
+	Tx := 64
+	Ty := 32
+	Tr := 0
+	TrZ := 0b0010
+
+	draw_crosshairs_from_memory
+
+	update_trz_code
+
+	v0 := TrZ
+	v2 := Tr
+
+	:macro calc_next_crosshair {
+		next_crosshair := random 0b00001111
+		next_crosshair += 4
+	}
+	calc_next_crosshair
+	jump0 update_rotation_code
+
+	loop
+
+		v0 := 0 if v0 key begin
+			:breakpoint q
+			v0 += 1
+		end
+
+		# Let's handle input:
+		# It would be handy to know if the player has not pushed any input
+
+		:alias detect_rot v5
+		:alias player_input v6
+
+		player_input := 0
+		
+		v0 := 0xE if v0 key then jump trigger_pull
+
+		: cross_return
+
+		detect_rot := Tx
+		v0 := 7   if v0 key then Tx += -1 # keyboard A
+		v0 := 9   if v0 key then Tx +=  1 # keyboard D
+		if Tx != detect_rot then player_input += 1
+
+		detect_rot := Ty
+		v0 := 5   if v0 key then Ty += -1 # keyboard W
+		v0 := 8   if v0 key then Ty +=  1 # keyboard S
+		if Ty != detect_rot then player_input += 1
+
+		# We only have to run this code if they push a button:
+		if player_input == 0 then jump service_rot
+
+		# Gate player
+		if Tx == player_LEFT_LIMIT then Tx += 1 # ie, go right
+		if Tx == player_RIGHT_LIMIT then Tx += -1
+		if Ty == player_TOP_LIMIT then Ty += 1
+		if Ty == player_LOW_LIMIT then Ty += -1
+
+		# We will use v5 to indicate we're trying to change rotation:
+
+		: service_rot
+		detect_rot := Tr
+		v0 := 4   if v0 key then Tr += -1 # keyboard Q
+		v0 := 6   if v0 key then Tr +=  1 # keyboard E
+		# Skip rotation update if rotation is unchanged:
+		if detect_rot == Tr then jump update_rotation_code_return
+
+		# Here, if detect_rot is 0 and player_input is 0 then we
+		# don't need to update our positions
+
+		# if player_input is 1 but detect_rot is 0 then we don't need
+		# to update rot
+
+		# if player_input is 0 but detect_rot is 1, then we still
+		# need to update stuff
+
+		# 0 0 nothing
+		# 1 0 pos only
+		# ? 1 both
+
+		# begin
+			# This code runs only on r change
+			player_input += 1
+
+			if Tr == 45 begin
+				Tr := 0
+				TrZ += 0b010
+				if TrZ == 0b010000 then TrZ := 0
+				update_trz_code
+			end
+			if Tr == -1 begin
+				Tr := 44
+				TrZ -= 0b010 # mm sugar
+				if TrZ == 0b11111110 then TrZ := 0b001110
+				update_trz_code
+			end
+			# Rotation must have changed for us to be here:
+			# if __1_, then Tr can be used to index into the tan table normally
+			# if __0_, then the correct value is 45 - Tr
+
+			# Here's a mad solution:
+			v0 := TrZ
+			v2 := Tr
+			jump0 update_rotation_code
+		# end
+		: update_rotation_code_return
+			# Here, we KNOW that the player pushed something
+			# Can we all directly into the update code?
+
+		# Undraw the existing cursors:
+		draw_crosshairs_from_memory
+
+		# Perform duty cycle
+		i := frame_cycle_count
+		load v0
+		v0 += 8
+		if v0 == 64 begin
+			v0 := 0
+			frame_stepper += 0x80
+		end
+		i := frame_cycle_count
+		save v0
+
+		# If player_input is true then we must redraw
+		# if it is 0 then we can use saved values
+		if player_input == 0 begin
+			# DONT UPDATE STUFF:
+			draw_crosshairs_from_memory
+			jump bypass_crosshair_update
+		end
+
+		if next_crosshair != 0 then next_crosshair += -1
+
+		############ UPDATE STUFF
+		# Calculate first:
+		DoFirstCrosshair
+		: apply_on_axis_main_memory
+		apply_on_axis_main
+		# cross_x and y are v0 and v1
+
+		# it is INCREDIBLY helpful to retain the original axis values
+		: address_crosshair_1_data_memory
+		i := crosshair_1_data
+		save off_axis
+
+		i := crosshair_b
+		if frame_stepper != 0 then i := crosshair_a
+		sprite cross_x cross_y 3
+
+		DoSecondCrosshair
+		: apply_on_axis_flipped_memory
+		apply_on_axis_flipped
+
+		: address_crosshair_2_data_memory
+		i := crosshair_2_data
+		save off_axis
+
+		i := crosshair_a
+		if frame_stepper != 0 then i := crosshair_b
+		sprite cross_x cross_y 3
+
+		: bypass_crosshair_update
+
+		# Let's service enemies in the field
+		# We don't need to process them all
+		# But we do need to process them at all
+
+		## v0 is our current frame cycle value
+
+		service_enemy
+
+		: trigger_return
+
+		if next_crosshair <= 6 begin
+			: draw_player_crosshair
+			# Draw crosshair
+
+			i := player_crosshair_adjust
+			load v1
+
+			i := long player_crosshair
+			v0 += Tx
+			v1 += Ty
+			#v0 -= 3
+			#v1 -= 3
+
+			sprite v0 v1 8
+
+			# Try to delay only one 60 fps frame most of the time:
+			vf := 1
+			f_delay
+
+			# Undraw crosshair
+			sprite v0 v1 8
+
+			if next_crosshair == 0 begin
+				calc_next_crosshair
+
+				# calculate small offset to player crosshair
+				i := player_crosshair_adjust
+				v0 := random 0b00000011
+				v0 -= 4
+				if v0 == -1 then v0 := -3
+				v1 := random 0b00000011
+				v1 -= 4
+				if v1 == -1 then v1 := -3
+				save v1
+			end
+
+			jump no_next_crosshair
+		end
+
+		vf := 1
+		f_delay
+
+		: no_next_crosshair
+		next_crosshair += -1
+
+		i := long register_dump
+		save vF
+
+	again
+
+
+
+	jump main
+
+
+
+: reset_for_new_game_loop
+	# Clear the screen:
+	plane 3
+	clear
+	plane 1
+	# Restore registers to all 0
+	i := long wipey_wipe
+	load vF
+;
+
+: frame_cycle_count
+  0
+
+: player_crosshair_adjust
+ 0 0
+
+: draw_crosshairs_from_memory
+	i := crosshair_1_data
+	load cross_y
+	i := crosshair_b
+	if frame_stepper != 0 then i := crosshair_a
+	sprite cross_x cross_y 3
+
+	i := crosshair_2_data
+	load cross_y
+	i := crosshair_a
+	if frame_stepper != 0 then i := crosshair_b
+	sprite cross_x cross_y 3
+;
+
+: crosshair_1_data
+ 0x5b 0x1F 
+ 			: crosshair_1_subpixels
+ 			0x1C 
+ 				: crosshair_1_onaxis
+ 				0 0
+: crosshair_2_data
+ 0x22 0x1F
+ 			: crosshair_2_subpixels
+ 			0x1D
+ 				: crosshair_2_onaxis
+ 				0 0
+
+
+# These are determined by our current rotation
+: apply_on_axis_main
+	: simple_axis_apply_target_A
+	vF := vF
+	vF := vF
+;
+
+: apply_on_axis_flipped
+	: simple_axis_apply_target_B
+	vF := vF
+	vF := vF
+;
+
+: DoSecondCrosshair
+	v0 := TrZ
+	vF := 0b1000
+	v0 ^= vF
+	jump0 SetupOnAxis	# Note shared return path
+
+: DoFirstCrosshair
+	v0 := TrZ
+	jump0 SetupOnAxis
+	############ ->>>>>>>>>>>>
+
+	: AxesReturnPoint
+	# Store the final subpixel value into v2:
+	v2 := v1
+
+	# This is going to nuke v0 and v1
+	cross_x := Tx
+	cross_x -= 1
+	cross_y := Ty
+	cross_y -= 1
+;
+
+: SetupOnAxis
+# 0000 # On axis: +X, off axis -Y
+jump SetupOnPosX
+# 0010 # On axis: +X, off axis +Y
+jump SetupOnPosX
+# 0100 # On axis: +Y, off axis +X
+jump SetupOnPosY
+# 0110 # On axis: +Y, off axis -X
+jump SetupOnPosY
+# 1000 # On axis: -X, off axis +Y
+jump SetupOnNegX
+# 1010 # On axis: -X, off axis -Y
+jump SetupOnNegX
+# 1100 # On axis: -Y, off axis -X
+jump SetupOnNegY
+# 1110 # On axis: -Y, off axis +X
+jump SetupOnNegY
+
+: SetupOffAxis
+# 0000 # On axis: +X, off axis -Y
+jump SetupOffNegY
+# 0010 # On axis: +X, off axis +Y
+jump SetupOffPosY
+# 0100 # On axis: +Y, off axis +X
+jump SetupOffPosX
+# 0110 # On axis: +Y, off axis -X
+jump SetupOffNegX
+# 1000 # On axis: -X, off axis +Y
+jump SetupOffPosY
+# 1010 # On axis: -X, off axis -Y
+jump SetupOffNegY
+# 1100 # On axis: -Y, off axis -X
+jump SetupOffNegX
+# 1110 # On axis: -Y, off axis +X
+jump SetupOffPosX
+
+# 0000
+		# On axis: +X, off axis -Y
+: SetupOnPosX
+	on_axis := UR_X
+	on_axis -= Tx
+	jump0 SetupOffAxis
+
+: SetupOnNegX
+	on_axis := Tx
+	on_axis -= UL_X
+	jump0 SetupOffAxis
+
+: SetupOnPosY
+	on_axis := LL_Y
+	on_axis -= Ty
+	jump0 SetupOffAxis
+
+: SetupOnNegY
+	on_axis := Ty
+	on_axis -= UL_Y
+	jump0 SetupOffAxis
+
+
+: SetupOffPosX
+	off_axis := UR_X
+	off_axis -= Tx
+	jump get_off_axis
+
+: SetupOffNegX
+	off_axis := Tx
+	off_axis -= UL_X
+	jump get_off_axis
+
+: SetupOffPosY
+	off_axis := LL_Y
+	off_axis -= Ty
+	jump get_off_axis
+
+: SetupOffNegY
+	off_axis := Ty
+	off_axis -= UL_Y
+	jump get_off_axis
+
+
+: qtex
+	v2 := 0
+	v3 := 5
+	loop
+		sprite v0 v1 5
+		v0 += 8
+		v2 += 1
+		i += v3
+		if v2 != 4 then
+	again
+;
+
+: get_off_axis
+	# Takes:
+	# on_axis: the large value of the triangle
+	# off_axis: the maximun acceptable value for the triangle
+
+	# Returns:
+	# on_axis on final axis vector
+	# off_axis off final axis vector
+	# 
+
+	:alias work_rot v2
+	:alias WIP_off v5
+
+	# Yep you guessed it self modifying code:
+	:next quick_rot_for_axis
+	work_rot := 0x00
+
+	# if they're literally presenting a 0 degree angle, then, we have no off axis to calculate
+	if work_rot == 0 begin
+		off_axis := 0
+		v1 := 0x80
+		# Obviously, this is already the case:
+		# on_axis := on_axis
+		jump AxesReturnPoint
+	end
+
+	if work_rot == 45 begin
+		# This case is a little more complicated, but in essence
+
+		# if we need to remember to set v1 register to subpixels count
+		# then we can do that here:
+		v1 := 0x80
+
+		# What on and off axis are is... vague
+		# But if either axis is less than the other then that's the minimum
+
+		if on_axis > off_axis then on_axis := off_axis
+		if off_axis > on_axis then off_axis := on_axis
+		jump validated_off_axis
+		end
+	
+	
+	# Also modify our backup plan memory read as this is the unadjusted base of the table
+	# This is whe data we want to adjust:
+	: offaxis_mem_read_base
+	i := long quick_tan_table
+	:calc offaxis_mem_read { offaxis_mem_read_base + 2 }
+
+	i += on_axis
+	i += on_axis
+
+	load v1
+	# v0 will be total off axis displacement
+	# v1 will be the remaining subpixels at this point
+
+	WIP_off := v0
+
+
+	if WIP_off > off_axis begin
+		# unfortunately, this exceeds our stated maximum
+		# We could raycast however we can also precompute the best result
+		# for every one of these, like we do for the on_axis read
+
+		# if we do this then we lose the knowledge of what our subpixels are
+		# Maybe it's best just to get our subpixels again when we need them?
+
+		WIP_off := off_axis
+		0xF0 00
+		: off_axis_table_address
+		0 0
+
+		i += off_axis
+		load v0
+
+		:monitor off_axis_table_address 2
+		# We must not exend on access though:
+		if v0 < on_axis then on_axis := v0
+	end
+	# otherwise this is a perfectly find on axis length
+	off_axis := WIP_off
+
+	: validated_off_axis
+	# If this off axis in excess of our maximum?
+	# Who knows
+	jump AxesReturnPoint
+
+
+: set_i_to_offaxis
+	0xF0 00
+	: mem_generic_off_axis
+	0 0
+;
+
+
+
+# This is a jump table
+# We are going to receive one of the 8 zones here:
+# Uses up code, but is in principal faster than anding out the bits.
+# Maybe
+# jump0 -> jumpT -> Entry
+# vF := 0b10 -> vf &= TrZ -> if vf then Entry / Entry
+: update_rotation_code
+	jump flip_rotation
+	jump leave_rotation
+
+	jump flip_rotation
+	jump leave_rotation
+
+	jump flip_rotation
+	jump leave_rotation
+
+	jump flip_rotation
+	jump leave_rotation
+	# Rotation must have changed for us to be here:
+	# if __0_, then the correct value is 45 - Tr
+	# if __1_, then Tr can be used to index into the tan table normally
+
+# We save a copy of the normalisd rotation into memory here
+: rotation_normalised
+	0
+# v0 will be a safe copy of TrZ
+# v2 is a copy of the rotation
+: flip_rotation
+	v1 := 45
+	v2 =- v1
+: leave_rotation
+	# At this time v2 now contains our correct rotation value for our tables:
+	# v2: Rotation to use for quick_tan
+
+	# let's save this
+	v0 := v2
+	i := rotation_normalised
+	save v0
+
+	# We need to obtain the memory address of the pregenerated memory from quick_tan
+	i := long quick_tan
+	# Add rotation, twice:
+	i += v2
+	i += v2
+	load v1
+	# v0 v1 now contain the correct value for the starting memory address for this rotation
+
+	i := offaxis_mem_read
+	save v1
+
+	i := long quick_off_axis
+	i += v2
+	i += v2
+	load v1
+	i := off_axis_table_address
+	save v1
+	i := mem_generic_off_axis
+	save v1
+
+	# Also, set the value for rotation in get_off_axis:
+	v0 := v2
+	i := quick_rot_for_axis
+	save v0
+
+	jump update_rotation_code_return
+
+	# Technically we only need to like, do this, if TrZ has changed:
+: update_trz_code
+	# put a doubled version in vE
+	vE := TrZ
+	vE += TrZ
+
+	i := long simple_axis_apply
+	i += vE
+	load v3
+
+	i := simple_axis_apply_target_A
+	save v3
+
+	# put the correct value to bitflip to the opposrite side:
+	vF := 0b10000
+	vE ^= vF
+	i := long simple_axis_apply
+	i += vE
+	load v3
+
+	i := simple_axis_apply_target_B
+	save v3
+
+	# Then we must return, and, we jumped here, so
+;
+
+: trigger_pull
+	# We want to strobe a pixel from crosshair_a to crosshair_b
+	# We know the real positions of these crosshairs in crosshair_1_data
+	# And we know the on and off axis values relative to the player
+
+	# No matter what we are pulling the trigger here
+
+	# We use up to v8 in this function, which is ok and doesn't affect normal gameplay
+
+	v2 := random 0x01
+	if v2 == 0 then	i := address_crosshair_1_data_memory
+	if v2 == 1 then i := address_crosshair_2_data_memory
+	load v1
+	i := pull_trigger_internal_loop
+	save v1
+	if v2 == 0 then	i := apply_on_axis_flipped_memory
+	if v2 == 1 then i := apply_on_axis_main_memory
+	load v1
+	i := pull_trigger_internal_loop_apply_memory
+	save v1
+
+	increase_sweeps
+	
+	# Load up the on subpixels and onaxis value for crosshair 1
+	i := crosshair_1_subpixels
+	load v1
+
+	# v0 = subpx of crosshair 1
+	# v1 = on axis of crosshai r1
+
+	# We could Copy subpixels into subpixel accumulating register
+	# But we might not be starting from here.
+	# So we don't
+	# v2 := v0
+	# v1 is our current on axis
+
+	# So load up just this value from crosshair 2:
+	i := crosshair_2_onaxis
+	load v0
+	# Add the two onaxis values together
+	v1 += v0
+
+	# Save to a register
+	v6 := v1
+	# And fix the remaining offset:
+	v6 += -1
+
+	# Load up the normalised rotation:
+	i := rotation_normalised
+	load v0
+
+	# Look up the memory location for subpixels per frame:
+	i := long tan_table
+	# Step in by rotation
+	i += v0
+	# Load it up
+	load v0
+	# Store it for later!
+	subpx_step := v0
+
+	# Now, since we actually want every pixel between the two locations
+	# It's more code efficient to actually math it out rather than use our tables
+
+	vE := 0
+	
+	i := 0x180
+	save vF
+
+		# Our loop here:
+		# v0 = cross_x
+		# v1 = cross_y
+		# v2 = subpixel accumulator
+		# v3 = on_axis
+		# v4 = off_axis
+		# v5 = subpx_step
+		# v6 = distance_countdown
+		# v7 = check for collisions with player sweep
+		# v8 = end condition
+		# vE = Allows for the delay of frames
+
+	# Track points with this:
+	Tx := 0
+	# Starting points should be the current number of sweeps:
+	i := long sweeps_this_level
+	# Let's get XO chip finally
+	load Tr - Tr
+	vF := 10
+	Tr =- vF
+
+	# Draw the line
+	# in theory if we hit something we're not supposed to, we need to crash out
+	v7 := 1
+	v8 := 0
+
+	pull_trigger_internal_loop
+	if v7 == 2 begin
+		# if we hit something bad, we have to undraw the line we drew, and skip 
+		# collision testing
+		jump line_abort_point
+	end
+	
+	
+	q_delay
+
+	# We now juse the graphics planes to avoid having to undraw all the enemies by just only drawing them
+	# into the plane 2 where the line currently resides
+	# We have to remove all enemies first and test them individually against the line
+	# Turn off collisions:
+	#v5 := 0
+	# Remove them all:
+	#sweep_enemies
+	#sweep_trash
+	
+	# Activate collision detection
+	v5 := 1
+	# Test one at a time (as part of v5 being on)
+	sweep_trash
+	if Tx == 0 then Tr := 0
+	sweep_enemies
+
+
+	plane 1
+
+
+	draw_score
+	i := long score_this_level
+	load v0 - v0
+	v0 += Tx
+	# Don't need with v0 - v0 leaving I static:
+	# i := long score_this_level
+	save v0 - v0
+	draw_score
+
+	# if v7 is 0 then we got all the trash:
+	if v7 == 0 begin
+		#:breakpoint level_complete
+		# Get the level we loaded:
+
+		v0 := 4
+		v1 := 2
+		loop
+			buzzer := v1
+			vF := 10
+			f_delay
+			v0 -= 1
+			if v0 != 0 then
+		again
+
+		v0 := key
+
+		i := load_level_number
+		# We must have completed this level
+		load vA - vA
+		# vA := v0
+
+		i := long level_select_last
+		load v0 - v3
+		# v0: current level
+		# v1: total levels unlocked
+		# v2: total levels competed
+		# v3: current chapter
+
+		vA += 1
+		v2 := vA
+		vA += 1
+		v1 := vA
+
+		# i := long level_select_last
+		save v0 - v3
+
+		jump game_restart
+	end
+
+	# turn off collision check
+	#v5 := 0
+	# And restore the enemies:
+	#sweep_enemies
+	#sweep_trash
+
+
+	: line_abort_point
+	# Then undraw the line:
+	i := 0x180
+	# restore how many pixels to draw
+	load v6
+	v7 := 0
+	if v8 != v6 then pull_trigger_internal_loop
+
+	i := 0x180
+	load vF
+	plane 1
+
+	jump trigger_return
+	
+: trigger_quick_mem
+ 0 0
+
+ : sweep_trash
+ 	# use v6 to count in 3s
+ 	v6 := 0
+ 	# Use v5 to count linearly now:
+ 	v5 := 0
+ 	#plane 1
+
+ 	# We can also use v7 at this time:
+
+ 	v7 := 0
+
+ 	#if v5 == 1 then 
+ 	plane 2
+ 	loop
+	 	i := long quick_trash
+	 	i += v6
+	 	load v2
+
+	 	if v2 == -1 then jump skip_trash_sweep
+
+	 	# At least 1 item of trash remains
+	 	v7 += 1
+
+	 	i := long furniture
+	 	i += v2
+	 	sprite v0 v1 8
+
+	 	#if v5 != 0 begin
+	 		vE := vF
+			sprite v0 v1 8
+	 		if vE != 0 begin
+
+	 			v7 += -1
+				plane 1
+				sprite v0 v1 8
+				
+				Tx += Tr
+				if Tr != 0 then Tr += 1
+
+				v2 := v5
+				calc_trash_ui_pos
+
+				v0 -= 1
+				v1 -= 1 
+				
+				i := long trash_get
+				#sprite v0 v1 0
+				plane 2
+				sprite v0 v1 0
+
+	 			i := long level_reset_data
+	 			load v2
+	 			i := long quick_trash
+	 			i += v6
+	 			save v2
+	 		end
+	 	#end
+
+	 	: skip_trash_sweep
+ 		v6 += 3
+ 		v5 += 1
+
+ 		if v6 != 27 then
+ 	again
+
+ ;
+
+: sweep_enemies
+	v6 := 0
+
+	#plane 1
+	#if v5 == 1 then
+	plane 2
+
+	loop
+		i := long enemy_fast_redraw
+		i += v6
+		load v3
+
+		if v3 == -1 then jump trigger_skip_empty_mob
+		i := long brushable_mobs
+		i += v2
+
+		sprite v0 v1 8
+		# Test vF here perhaps
+		#if v5 == 1 begin
+			vE := vF
+			sprite v0 v1 8
+			if vE == 0 begin
+				# This enemy did not touch our line, we can undraw it to stop testing
+				jump trigger_skip_empty_mob
+			end
+
+			Tx += Tr
+			if Tr != 0 then Tr += 1
+
+			plane 1
+			sprite v0 v1 8
+			plane 2
+
+			# Otherwise it does collide, specifically with our line
+			# If that happens, we could remove it from the game here
+			# That depends on us knowing that the line is good
+			# and did not collide with anything it shouldn't be allowed to
+
+			# We can use graphics planes to acheive the above perhaps
+
+			# But let's remove this enemy from the redraw list:
+			i := long enemy_fast_wipe
+			load v3
+			i := long enemy_fast_redraw
+			i += v6
+			save v3
+
+			# And also request that it be removed
+			remove_enemy
+		#end
+
+		: trigger_skip_empty_mob
+		v6 += 0x08
+		if v6 != 64 then
+	again
+;
+
+
+: pull_trigger_internal_loop	# This label is used to change
+		# Plot to the starting point:						|
+		i := crosshair_2_data	# <-------------------------- this command
+		load v2
+		cross_x += 1
+		cross_y += 1
+
+		# We know that v2 contains the subpixels achieved by the line when it hit the barrier
+		# But we are going to be counting backwards
+		# So let's just invert this value and call it good:
+
+		vF := 0xFF
+		v2 ^= vF
+		v2 += 1
+
+		plane 2
+		
+		loop
+			# We can just step on 1 pixel at a time:
+			on_axis := 1
+			off_axis := 0
+			v2 += subpx_step
+			if vf != 0 then off_axis := 1
+			# Easy 45 degree mode:
+			if subpx_step == 0xFF then off_axis := 1
+			
+			# If I wanted to reverse this, I would call the other command
+			# And start at the other coords
+			: pull_trigger_internal_loop_apply_memory
+			apply_on_axis_main
+
+			i := long line_v
+			sprite cross_x cross_y 1
+
+			if v7 == 0 then vF := 0
+
+			if vF != 0 begin
+				# We've hit something we're not allowed to
+				# We have to abort this line
+
+				on_axis := 5
+				off_axis := 4
+
+				v8 := v6
+
+				plane 3
+				loop
+					scroll-up 1
+					buzzer := off_axis
+					vF := 4
+					f_delay
+					on_axis -= 1
+					scroll-down 1
+					vF := 4
+					f_delay
+					if on_axis != 0 then
+				again
+				plane 2
+
+				sprite cross_x cross_y 1
+				v7 := 2
+				return
+			end
+
+
+			vE += 0b01000000
+			if vE == 0 begin
+				q_delay
+			end
+
+			v6 += -1
+
+			if v6 != v8 then
+		again
+
+		plane 1
+;
+
+: q_delay
+	vf := 1
+: f_delay
+	delay := vf
+	loop
+		vf := delay
+		if vf != 0 then
+	again
+;
+
+: clean_enemy_variables
+	# These sure look like the same code, twice
+	# Clear Vars?
+	i := long enemy_fast_wipe
+	load v7
+	i := long enemy_fast_redraw
+
+	v8 := 0
+	
+	: repeat_clear_loop
+	loop
+		save v7
+		v8 += 1
+		# Exits after the 2nd pass
+		if v8 == 16 then return
+		# Runs the code below after the first pass:
+		if v8 != 8 then
+	again
+
+	i := long enemy_list_wipe
+	load v7
+	i := long enemy_list
+	jump repeat_clear_loop
+
+# So let's do it with actual code, at run time, because we can!
+: generate_tan_table
+	# I want to generate a table of
+	# whole px, subpx for each distance value, per angle
+	# Max distance is 8 * 7, so let's assume ~63 for easy data stride
+	# Angle is from (in principal) 0 to in principal (45)
+	# But we start with 1 because 0 is... all 0s
+
+	Tr := 1
+
+	# So, this code runs over the whole rotation space and yields the off_axis value for an on_axis displacement
+	# We have a 2nd table, which works in the reverse - the maximum on_axis displacement for a given off_axis (per rotation)
+	# We also want access to the remainder subpixels for a given on axis displacement.
+	# This allows us to pull subpixels per step from tan_table and still know where to start,
+	# when drawing a line, as we define our starting point as a vague point on the line
+	# (to allow for simple player control that feels good)
+	# Either I can work this out on hit, or, I can form a table
+	# This code here is able to generate table 1 and table 3,
+	# but the process of having the correct final result for the subpixels is muddied
+	# You only need this when you try to draw a line, so it's just making the 
+	# hot loop slower to ensure we have these to handy
+	# So, how can we change this code so that it generates the subpixel table separately?
+
+	loop
+		# Pull our incrimental subpixel value for this rotation:
+		i := long tan_table
+		i += Tr
+		load v0
+
+		# I have a problem.
+		# I want to self modify this code:
+		: tangen_address_base
+		i := long quick_tan_table
+		:calc code_tangen_address { tangen_address_base + 2 }
+		# fortunately we modify this AFTER we have already used it, later in this loop
+		# Otherwise I can't use calc?
+
+		:monitor tangen_address_base 8
+
+		# Register set up per pass:
+		# Initial sub pixels:
+		v1 := 0x80 
+		v3 := 0
+		# Copy subpixels to another, safe register:
+		subpx_step := v0 # v5 will be subpix per step
+		v0 := 0  # v0 will be total displacement
+
+		# We will have I pointing at the correct location of this extended tan data
+		# We save the 0 value to prevent complicated maths. Same reason we start with r 0
+
+		loop
+			# We will change this to v1 for a 2nd pass:
+			:next generate_tan_table_value_retain
+			#v0 := v2
+			# Save current data (and step on)
+			save v1
+
+			# Incriment subpixels:
+			v1 += subpx_step
+			# If this overflows, we increase displacement in v0
+			if vf != 0 then v0 += 1
+
+			# v3 counts up:
+			v3 += 1
+			# Do this 63 times:
+			if v3 != 64 then
+		again
+
+		i := code_tangen_address
+		load v1
+
+		# We now have the memory address of the data for quick_tan_table + r * 64 in our v0 and v1
+		# Turns out we want that in our quicktan table:
+		: generate_tan_table_lookup_base_address
+		i := long quick_tan
+
+		# Set vD to 180 for subpixel table
+		i += vD
+
+		# Incriment I by 2x Tr
+		i += Tr
+		i += Tr
+		save v1
+		
+		# Then work out the next address:
+		v2 := 0x80 # Data is 128 bytes each:
+		v1 += v2
+		if vf != 0 then v0 += 1
+
+		# Then we save that into our next pass's I command so we work out the next piece of data
+		i := code_tangen_address
+		save v1
+
+		# Step forward I:
+		Tr += 1
+
+		# OK I now have a mad table
+
+		if Tr != 45 then
+	again
+;
+
+
+	
+
+: generate_offaxis_max_table
+	# So, we also want a table that allows us to figure out the maximum value 
+	# of an on_axis line if the off_axis has to be clamped to some lower value
+	# We could either search through the displacement data (eg as a binary search)
+	# or we can create a table that gives us the answer
+
+	Tr := 1
+
+	# Steal the last valid good memory address from the other function:
+	i := code_tangen_address
+	load v1
+	i := offaxis_gen_memory_target
+	save v1
+
+	# We could use our existing table to work this out but it's actually slightly
+	# easier to work from scratch
+	# typical offset is quick_tan_table + 5632
+	loop
+		i := long tan_table
+		i += Tr
+		load v0
+		subpx_step := v0
+
+		# v0 as on_axis will be the maximum value that we can count to before we overflow to the next pixel.
+		v0 := 0
+		# off axis:
+		off_axis := 0
+
+		# This time, subpixels will be 0:
+		v2 := 0x00
+		
+		# We will use the overflow to indicate when we've found the next 
+
+		# i := long
+		0xF0 00
+		: offaxis_gen_memory_target
+		00 00
+
+		# if you want to go 0 px off axis, you can go... 0?
+		save v0
+
+		loop
+			v0 += 1
+			v2 += subpx_step
+			if vF != 0 begin
+				# the current value of on axis is the maximum value for this off axis
+				save v0
+				# i will step on by off_axis amount
+				off_axis += 1
+				end
+
+
+			if v0 != 63 then
+		again
+
+		save v0
+		off_axis += 1
+
+		v0 := 0xFF
+		save v0
+		off_axis += 1
+
+		i := offaxis_gen_memory_target
+		load v1
+
+		# update the table, I guesss!!!
+
+		i := long quick_off_axis
+		i += Tr
+		i += Tr
+		save v1
+
+		v1 += off_axis
+		v0 += vF
+		i := offaxis_gen_memory_target
+		save v1
+
+		Tr += 1
+		
+		if Tr == 45 begin
+			# the next memory address is set up correctly
+			i := final_off_axis_save
+			save v1
+			
+			i := long quick_off_axis
+			i += Tr
+			i += Tr
+			save v1
+		
+			
+			0xF0 00
+			: final_off_axis_save
+			0 0 
+			
+			v0 := 0
+			v1 := 1
+			v2 := 2
+			
+			save v1
+			
+		end
+
+		if Tr != 45 then
+	again
+	
+	# We also want a 1 pixel deep final value for 45 degrees
+	
+	
+
+;
+
+: service_enemy
+	# v0 is the current value of frame cycle
+	# which atm is a value of 0b????0000
+
+	# v0 := Current movement type    --------- (gets moved elsewhere)
+	# v1 := Current movement subframe --------- (gets moved elsewhere)
+	# v2 := mob_frame : Current animation Frame
+	# ------------ Easy Save separation
+	# v3 := mob_x : Grid X position
+	# v4 := mob_y : Grid Y position
+	# v5 := mob_type : Type of enemy, useful for working out graphic and movement type
+	# v6 := movement index
+	# v7 := 
+	# ------------------
+	# v8 := infinite loop protection when deciding next movement type
+	# v9 := movement subframe relocate
+	# vA := mob movement type
+	# vB mob_data_spacing
+	# vC mob_draw_y
+	# vD mob_draw_x
+	# vE 
+
+	:alias mob_frame v2
+	:alias mob_x v3
+	:alias mob_y v4
+	# 8 bytes per mob
+	:alias mob_type v5
+	:alias mob_movement_index v6
+	:alias mob_speeder v7
+
+	:alias mob_infinite_loop_protection v8
+	:alias mob_movement_type vA
+	:alias mob_movement_subframe v9
+
+	:alias mob_data_spacing vB
+	:alias mob_draw_x vD
+	:alias mob_draw_y vC
+
+	i := frame_cycle_count
+	load v0
+
+	i := long enemy_list
+	i += v0
+	# Keep this for a hot minute in case we need it:
+	vE := v0
+	load enemy_data_size
+
+	# This will load our enemy into our registers v0 to v7?
+
+	# If there's no mob here, we skip:
+	if mob_type == -1 then jump maybe_create_enemy
+	# We need to get the display position of this mob:
+: enemy_created
+	# Backup our registers
+	i := 0x180
+	save vF
+
+	# Copy our data over to our retaining registers:
+	mob_movement_type := v0
+	mob_movement_subframe := v1
+
+	# Step A: Load up the X/Y coords into mob_x mob_y
+
+	# Now because we save the enemy position we don't need to do this:
+	# calc_mob_draw_xy
+
+
+	# mob_type is now a 0x8 strided list
+	# load up the sprite spacing for this sprite:
+	# i := mob_spacing
+	# i += mob_type
+	# load v0
+	# mob_data_spacing := v0
+
+	# If the mob frame is -1, then it's the first time it's ever been drawn
+	# In this case we don't need to undraw it:
+	if mob_frame == -1 begin
+		mob_frame := 0
+		mob_movement_subframe := 16
+		jump mob_skip_undraw
+	end
+
+	# Step B: we also need to know the enemy's last displacement:
+	# This uses movement_type and movement_subframe to load up the offsets
+	# into v0 and v1
+	# then we add in the base draw position of this enemy:
+
+	# We can do this:
+	#load_movement_subdata
+	#v0 += mob_draw_x
+	#v1 += mob_draw_y
+	# But instead we can do this:
+	i := long enemy_fast_redraw
+	i += vE
+	load v1
+	# We could load v2 and get the below offset, but we already have it:
+
+	# Point I at the sprite:
+	i := long brushable_mobs
+	i += mob_type
+	i += mob_frame
+
+	# Undraw the enemy:
+	sprite v0 v1 8
+
+	# Iterate the frame every time we process this enemy, so that
+	# it always does a little dance
+	# conviniently, the sprites are strided by 0x80
+	mob_frame += 0x80
+
+	# And move it only half the time.
+	# it would be cool if we could make some mobs move faster or slower:
+
+	mob_speeder -= 1
+
+	:const mob_speed_offset 0
+
+	if mob_speeder == 0 begin
+		i := long default_mob_datas
+		i += mob_type
+		v0 := mob_speed_offset
+		load v0
+		mob_speeder := v0
+		mob_movement_subframe += 2
+	end
+	
+	# Cycle the mob frame
+
+
+	if mob_movement_subframe == 16 begin
+		# We have completed our movement.
+		# We marked our new cell as ours when we started moving.
+		# So we must clear our current cell:
+
+		# If it's a type of movement that actually moves:
+		if mob_movement_type != 0 begin
+			v0 := mob_x
+			v1 := mob_y
+			address_game_cell
+			# i := long game_grid
+			# i += v1
+			v0 := -1
+			save v0
+			
+			# Get single digit translation:
+			mob_movement_subframe := 0
+			# We pick the subframe assoicated with 1 px offset
+			# But instead apply that to the grid:
+			load_movement_subdata
+			mob_x += v0
+			mob_y += v1
+			# New position marked
+		end
+
+		: mob_skip_undraw
+		# We should progress to the next part of their movement at this time
+
+		mob_infinite_loop_protection := 0
+		# We need to apply the kind of movement that we hoped to achieve
+		: mob_movement_jumpback
+		mob_infinite_loop_protection += 1
+		if mob_infinite_loop_protection == 6 then jump mob_loop_fail
+		# We need to defend against infinite loops at this time
+		if mob_movement_index == 16 then mob_movement_index := 0
+		# mob movement index is the reference from the start of this mob's movement pattern that we're at
+		i := long enemy_behaviors
+		i += mob_type
+		i += mob_type
+		i += mob_movement_index
+		# There are up to 16 kinds of thing that move with this system
+		# Each type of movement has 16 bytes available to it
+		# Load 2 bytes associated with movement
+		load v1
+
+		# If we've reached the end:
+		# Go back to the start
+		if v0 == -1 begin
+			mob_movement_index := 0
+			jump mob_movement_jumpback
+		end
+
+		# We just loaded from memory
+		# v0 is our new movement type
+		# v1 is our conditional
+
+		# we need to do some math thinking stuff here
+		# so we're going to need v0 and v1 shipped somewhere else
+		mob_movement_type := v0
+		vE := v1
+
+		if mob_movement_type == -2 begin
+			mob_movement_type := random 0b00110000
+			mob_movement_type += 16
+		end
+
+		# A non 0 movement type is obviously acceptable:
+		if mob_movement_type == 0 then jump movement_auto_valid
+
+		# we need to look up the cell associated with this new position:
+		mob_movement_subframe := 0
+		load_movement_subdata
+		v0 += mob_x
+		v1 += mob_y
+		address_game_cell
+
+		# v0 : cell data
+		# v1 : cell address
+
+		# If v0 is -1, then it's fine
+
+		# if v0 is NOT -1, then, we can't move right now
+		if v0 != -1 begin
+			# What we do now depends on the value of vE
+			# Progression rules:
+			# We also have conditionals
+			# 0: Progress regardless
+			# 1: Repeat until impossible
+			# 2: Retry until successful
+
+			# Progress anyway
+			if vE == 0 begin
+				# Just defer movement type to 0:
+				: mob_loop_fail
+				# This prevents us from experiencing another result:
+				vE := 0
+				mob_movement_type := 0
+				mob_movement_index += 2
+			end
+
+			# This movement is impossible, so we should actually progress to the next movement
+			if vE == 1 begin
+				# We want to progress on a step:
+				mob_movement_index += 2
+				# This can create an infinite loop if the enemy is unable to progress in any direction:
+				jump mob_movement_jumpback
+			end
+
+			if vE == 2 begin
+				# We want to do nothing for this frame, but not progress:
+				mob_movement_type := 0
+				# If we can't move because it's a bad coord, we'll never succeed!!
+				# So progress anyway:
+				if v0 == -2 then mob_movement_index += 2
+			end
+		end
+
+		if v0 == -1 begin
+			# Load up this enemy ID:
+			i := frame_cycle_count
+			load v0
+			# Target the game_grid and save our ID into it:
+			i := long game_grid
+			i += v1
+			save v0
+
+			: movement_auto_valid
+			# If we can move into this location
+			# Then v1 = 0 == progress
+			#      v1 = 1 == don't progress yet
+			#      v1 = 2 == progress
+			if vE != 1 then mob_movement_index += 2
+		end
+
+		# we need to save the whole enemy in this case
+
+		mob_movement_subframe := 0
+	end
+
+	calc_mob_draw_xy
+	load_movement_subdata
+	# Re index to sprite frame:
+
+	v0 += mob_draw_x
+	v1 += mob_draw_y
+
+	# Take a copy of exactly where we drew this enemy on the screen:
+	i := temp_e_data_b
+	save v1
+
+	i := long brushable_mobs
+	i += mob_type
+	i += mob_frame
+
+	# This is the exact position of where the mob is drawn
+	sprite v0 v1 8
+
+	# Right now, v0 and v1 contain the information I want about the sprite position
+	# mob_type + mob_frame consitute a < 256 byte offset to the graphic
+
+	i := frame_cycle_count
+	load v0
+	i := long enemy_list
+	i += v0
+
+	# Keep the offset somewhere
+	vE := v0
+
+	# Save our updated enemy data
+	# We move this data back into the save memory region:
+	v0 := mob_movement_type
+	v1 := mob_movement_subframe
+	save enemy_data_size
+
+
+	# Load up the X Y draw positions:
+	i := temp_e_data_b
+	load v1
+	# For the purposes of collsion, we want to quickly undraw this enemy
+	# Let's save the X Y position into a list
+	# Note that mob_frame IS v2
+	v2 += mob_type
+	v3 := mob_type
+
+	# Generate fast redraw info
+	i := long enemy_fast_redraw
+	i += vE
+	save v3
+
+	# Restore our regular gameplay registers:
+	i := 0x180
+	load vF
+;
+
+: temp_e_data_b
+ 0 0
+
+
+: calc_mob_draw_xy
+	i := long grid_xy
+	i += mob_x
+	load v0
+	mob_draw_x := v0
+
+	i := long grid_xy
+	i += mob_y
+	load v0
+	mob_draw_y := v0
+
+	# Translate over to the start of the grid:
+	mob_draw_x += UL_X_plus1
+	mob_draw_y += UL_Y_plus1
+;
+
+: load_movement_subdata
+	v0 := 0
+	v1 := 0
+
+	if mob_movement_type == 0 then return
+	# movement patterns are strided by 8 pairs of bytes
+	i := long movement_patterns
+	# we should store the direct access value in this register:
+	i += mob_movement_type
+	i += mob_movement_subframe
+	# load the two small offsets
+	load v1
+;
+
+: last_enemy
+ -8
+
+: maybe_create_enemy
+	# vF contains the current enemy slot that is empty
+	# I guess I should load an enemy from our hypothetical list of enemies:
+
+	i := last_enemy
+	load v0
+
+	v0 += 8
+	if v0 == 128 then v0 := 0
+
+	vF := random 0b00001111
+	if vF != 0 then return
+
+	i := last_enemy
+	save v0
+
+	v2 := v0
+
+	# enemy type is a multiple of 8
+	v3 := 0
+	# It also is where the current movement step is stored so it has to exist
+
+	# I guess maybe we have to loop this till we find an empty space?
+	# Note that this should be a multiple of 16 in order to work
+	: retry_get_empty_position
+	i := long random_mob_position
+	load v0
+	v0 += 2
+	if v0 == 200 then v0 := 0
+	i := long random_mob_position
+	save v0
+	i += v0
+	load v1
+	# next X Y coords loaded into v0 v1
+	# Set the enemy to these coords
+	i := long enemy_template_save_target
+	save v3
+
+	# Check this cell is actaully available:
+	address_game_cell 
+	# If not:
+	if v0 != -1 then jump retry_get_empty_position
+
+	# If yes:
+	# Register this enemy to this location:
+
+	i := long game_grid
+	i += v1
+	v0 := vE
+	save v0
+
+	i := long enemy_template
+	load v7
+
+	i := long enemy_list
+	i += vE
+	save v7
+	# We can now relocate enemy_template v7 to the new memory location
+
+	jump enemy_created
+;
+
+: remove_enemy
+	# v6 contains the enemy to remove as x8
+	i := long enemy_list
+	i += v6
+
+	# This enemy should be defaulted out
+	v0 := 5
+	i += v0
+	v0 := -1
+	save v0
+
+	# additionally, there may be cells associated with it in game_grid
+	# These need to be cleared out
+
+	v1 := 0
+	i := long game_grid
+	loop
+		load v0
+
+		if v0 == v6 begin
+			i := long game_grid
+			i += v1
+			v0 := -1
+			save v0
+		end
+		v1 += 1
+		if v1 != 49 then
+	again
+;
+
+
+
+: address_game_cell
+	# v0 := X pos
+	# v1 := Y pos
+	if v0 == 255 then jump bad_coord
+	if v0 == 7 then jump bad_coord
+	if v1 == 255 then jump bad_coord
+	if v1 == 7 then jump bad_coord
+
+	# Take the value in v1, the Y position
+	# And effectively multiply it by 7:
+	i := long game_grid_stride
+	i += v1
+	# v1 is done with, copy v0 into v1
+	v1 := v0
+	# Load the mul7 value into v0
+	load v0
+	# Add that value to v1
+	v1 += v0
+
+	# We also load the value of the game grid into v0 as part of this operation
+	i := long game_grid
+	i += v1
+	# By using load v0 - v0, we prevent I from stepping onward:
+	load v0 - v0
+;
+: bad_coord
+	v0 := -2
+	# v0 now has the value of this cell in it
+	# v1 now has the relative index to this cell in it
+;
+
+: draw_obstacles
+	v0 := 0
+
+	i := 0x180
+	save vF
+
+	plane 2
+
+	:alias trash_counter v7
+	:alias other_trash_counter v8
+
+	mob_y := 0
+	loop
+		mob_x := 0
+		loop
+			v0 := mob_x
+			v1 := mob_y
+			address_game_cell
+
+			# v0 will be content
+			# v1 will be offset from game_grid
+
+			if v0 != -1 begin
+				mob_type := 128
+				mob_type += v0
+				if vF == 1 begin	
+					# if the item was in the region at 128 or aboutve:
+					# We know it's the index of something special
+
+					# We probably want the x8 version of this index:
+					v2 <<= mob_type # x2
+					v2 <<= v2 # x4
+					v2 <<= v2 # x8
+
+					# NO HIT obsticles that must not be hit:
+					if mob_type < 16 begin
+						plane 2
+						# furniture
+						calc_mob_draw_xy
+						i := long furniture
+						i += v2
+
+						sprite mob_draw_x mob_draw_y 8
+						jump draw_obstacles_pass_trash
+					end
+
+					# Trash items which must be cleared:
+					if mob_type < 32 begin
+						plane 1
+						calc_mob_draw_xy
+
+						v0 := mob_draw_x
+						v1 := mob_draw_y
+						i := long quick_trash
+						i += trash_counter
+						save v2
+
+						# Draw it because that makes things simpler:
+						i := long furniture
+						i += v2
+
+						sprite mob_draw_x mob_draw_y 8
+
+						v2 := other_trash_counter
+						calc_trash_ui_pos
+						sprite v0 v1 8
+
+						trash_counter += 3
+						other_trash_counter += 1
+					end
+				end
+
+				: draw_obstacles_pass_trash
+				vF := 8
+				f_delay
+			end
+
+			mob_x += 1
+			if mob_x != 7 then
+		again
+		mob_y += 1
+		if mob_y != 7 then
+	again
+
+
+
+	plane 1
+
+	i := 0x180
+	load vF
+;
+
+: calc_trash_ui_pos
+	# v2 is trash index
+	v0 := 98
+	v1 := 8
+	if v2 == 0 then jump skip_annoying_math
+	loop
+		v0 += 9
+		:calc what_would_it_be { 98 + 3 * 9 }
+		if v0 == what_would_it_be begin
+			v1 += 9
+			v0 := 98
+		end
+		v2 -= 1
+		if v2 != 0 then
+	again
+	: skip_annoying_math
+;
+
+: level_select_mode
+	# Captures gameplay and allows the player to select a level
+	reset_for_new_game_loop
+
+	i := long level_select_last
+	load v3
+
+	:alias total_levels_unlocked v8
+	:alias total_levels_complete v9
+	:alias current_chapter vA
+	:alias current_level vB
+	# v0: current level
+	# v1: total levels unlocked
+	# v2: total levels competed
+	# v3: current chapter
+	current_level := v0
+	total_levels_unlocked := v1
+	total_levels_complete := v2
+	current_chapter := v3
+
+	i := long mul_8
+	i += current_chapter
+	load v0
+
+	# We now know where to index into chapters
+
+	:alias chapter_offset v7
+	chapter_offset := v0
+
+	v6 := 0
+
+	# First, draw the layout:
+	mob_draw_x := 0
+	mob_draw_y := 1
+
+	:alias completed_levels_drawn v4
+	:alias highest_current_level v5
+	completed_levels_drawn := 0
+	highest_current_level := 0
+	loop
+		i := long chapters
+		i += chapter_offset
+		i += v6
+
+		load v0
+		# What are we looking at here:
+		if v0 == -1 begin
+			mob_draw_x += 4
+			i := long level_select_marker_first
+			sprite mob_draw_x mob_draw_y  8
+			mob_draw_x += 8
+			jump lv_select_end_loop
+		end
+
+		if v0 >= 0x80 begin
+			if v6 == 7 begin
+				if completed_levels_drawn != 6 then	jump lv_select_end_loop
+			end
+			i := long padded_line_h
+			sprite mob_draw_x mob_draw_y 4
+			mob_draw_x += 8
+			i := long level_select_marker_next
+			sprite mob_draw_x mob_draw_y  8
+			mob_draw_x += 8
+		end
+
+		if v0 < total_levels_unlocked begin
+			# This level is completed
+			i := long padded_line_h
+			sprite mob_draw_x mob_draw_y 4
+			mob_draw_x += 8
+			i := long level_select_marker
+			sprite mob_draw_x mob_draw_y  8
+
+			if v0 < total_levels_complete begin
+				completed_levels_drawn += 1
+				i := long level_select_complete
+				sprite mob_draw_x mob_draw_y  8
+			end
+
+			mob_draw_x += 8
+		end
+
+		highest_current_level := v6
+
+		: lv_select_end_loop
+		v6 += 1
+		if v6 != 8 then
+	again
+
+	highest_current_level += 1
+
+	: level_select_move_select_arrow
+	# Actual select loop:
+	# Use current 0 - 8 to select what we're looking at:
+	i := long mul_8
+	i += current_level
+	load v0
+	v0 += v0
+	v0 += 4
+	mob_draw_x := v0
+	mob_draw_y := 9
+	i := long level_select_pointer
+	sprite mob_draw_x mob_draw_y  8
+
+	#current_level
+
+	: level_select_reject_input
+	i := long level_select_pointer
+	v0 := key
+
+	if v0 == 7 begin
+		sprite mob_draw_x mob_draw_y  8
+		# Left
+		current_level += -1
+		if current_level == -1 then current_level := 0
+
+		jump level_select_move_select_arrow
+	end
+	if v0 == 9 begin
+		sprite mob_draw_x mob_draw_y  8
+		# Right
+		current_level += 1
+
+		i := long chapters
+		i += chapter_offset
+		i += current_level
+		load v0
+
+		if v0 == total_levels_unlocked then current_level -= 1
+
+		if current_level == highest_current_level then current_level -= 1
+
+		if current_level == 8 then current_level := 7
+
+
+		jump level_select_move_select_arrow
+	end
+	if v0 == 0xE begin
+		# F
+		i := long chapters
+		i += chapter_offset
+		i += current_level
+		load v0
+
+		if v0 == -1 then jump level_select_reject_input
+
+		# Change chapter
+		if v0 >= 0x80 begin
+			v0 -= 0x80
+			current_chapter := v0
+
+			if current_level == 0 then current_level := 6
+			if current_level == 7 then current_level := 1
+			v0 := current_level
+			v1 := total_levels_unlocked
+			v2 := total_levels_complete
+			v3 := current_chapter
+
+			i := long level_select_last
+			save v3
+			jump level_select_mode
+		end
+
+		# Otherwise we select this level:
+
+		v1 := v0
+
+		i := long level_select_last
+		save current_level - current_level
+
+		# Save the level to play into the appropriate location:
+		i := load_level_number
+		save v1 - v1
+
+		return
+	end
+	jump level_select_reject_input
+
+: increase_sweeps
+	
+	i := long sweeps_this_level
+	load v0
+	v3 := v0
+	draw_sweeps
+	v0 := v3
+	v0 += 1
+	if v0 == 11 then v0 := 10
+	i := long sweeps_this_level
+	save v0
+
+	# draw_sweeps
+	q_dig
+;
+
+: draw_sweeps
+	v1 := 28
+	v2 := 56
+	q_dig
+;
+
+: draw_score
+	i := long score_this_level
+	load v0
+
+	i := 0x170
+	bcd v0
+
+	load v0
+	v1 := 108
+	v2 := 56
+	q_dig
+
+	i := 0x171
+	load v0
+	v1 += 6
+	q_dig
+
+	i := 0x172
+	load v0
+	v1 += 6
+	q_dig
+
+	:monitor 0x170 3
+;
+
+: q_dig
+	i := long mul_5
+	i += v0
+	load v0
+	i := long fivewide_digits
+	i += v0
+	sprite v1 v2 5
+;
+
+
+
+
+
+
+# Ideally these will live in low memory
+: crosshair_a
+0b10100000
+0b00000000
+0b10100000
+
+: crosshair_b
+0b11100000
+0b11100000
+0b11100000
+
+:calc FREE { 4096 - HERE }
+: FREE_CODE_BYTES
+:byte { FREE >> 8 }
+:byte { FREE }
+:monitor FREE_CODE_BYTES "%2i"
+
+
 
 :calc probably_offaxis_data { quick_tan_table + 44 * 128 }
 #:monitor quick_off_axis 90
