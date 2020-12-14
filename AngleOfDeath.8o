@@ -191,7 +191,10 @@ to-data
 0 0 0
 
 : wipey_wipe
-0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+: levely_wevelly
+0 0 0 0 0 0 0 0
+0 0 0b0010 0 32 64 0 0
 
 : chapters
 -1    0  1  2  3  4  5 0x81
@@ -1457,32 +1460,40 @@ to-code
 	v0 := 0
 	load_level
 	
+	i := long levely_wevelly
+	load vF
 
-	Tx := 64
-	Ty := 32
-	Tr := 0
-	TrZ := 0b0010
+	# Loaded in from levely_wevelly:
+	#Tx := 64
+	#Ty := 32
+	#Tr := 0
+	#TrZ := 0b0010
 
+	# 'draw in' crosshairs so we can undraw them normally, later:
 	draw_crosshairs_from_memory
-
+	# update all the fast rotation code:
 	update_trz_code
-
-	v0 := TrZ
-	v2 := Tr
 
 	:macro calc_next_crosshair {
 		next_crosshair := random 0b00001111
 		next_crosshair += 4
 	}
 	calc_next_crosshair
+
+	# We 'jump' into the game loop as though the player just tried rotating slightly
+	# This updates everything to be hunky dory:
+	v0 := TrZ
+	v2 := Tr
 	jump0 update_rotation_code
 
-	loop
 
-		v0 := 0 if v0 key begin
-			:breakpoint q
-			v0 += 1
-		end
+
+	loop
+		# Don't really need this any more:
+		#v0 := 0 if v0 key begin
+		#	:breakpoint q
+		#	v0 += 1
+		#end
 
 		# Let's handle input:
 		# It would be handy to know if the player has not pushed any input
@@ -1571,14 +1582,15 @@ to-code
 
 		# Perform duty cycle
 		i := frame_cycle_count
-		load v0
+		load v0 - v0
 		v0 += 8
 		if v0 == 64 begin
 			v0 := 0
 			frame_stepper += 0x80
 		end
-		i := frame_cycle_count
-		save v0
+		# Use v0 - v0 to avoid I step:
+		#i := frame_cycle_count
+		save v0 - v0
 
 		# If player_input is true then we must redraw
 		# if it is 0 then we can use saved values
@@ -2100,9 +2112,9 @@ jump SetupOffPosX
 	# Step in by rotation
 	i += v0
 	# Load it up
-	load v0
+	load subpx_step - subpx_step
 	# Store it for later!
-	subpx_step := v0
+	# subpx_step := v0
 
 	# Now, since we actually want every pixel between the two locations
 	# It's more code efficient to actually math it out rather than use our tables
