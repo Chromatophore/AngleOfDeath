@@ -39,6 +39,24 @@
 
 :alias subpx_step v5
 
+#### Enemy Handling Aliasses:
+
+:alias mob_frame v2
+:alias mob_x v3
+:alias mob_y v4
+# 8 bytes per mob
+:alias mob_type v5
+:alias mob_movement_index v6
+:alias mob_speeder v7
+
+:alias mob_infinite_loop_protection v8
+:alias mob_movement_type vA
+:alias mob_movement_subframe v9
+
+:alias mob_data_spacing vB
+:alias mob_draw_x vD
+:alias mob_draw_y vC
+
 ## Calculate gameplay dimensions:
 
 :calc zone { 7 * 8 }
@@ -233,6 +251,8 @@ a_level_save 11 4
 : quick_trash # 7 x 4 items:
 0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	
 0 0 0   0 0 0   0
+
+:monitor quick_trash 28
 
 # I would waste so much memory just writing out the levels
 # like this but at least I can see them and decide if they're good
@@ -1223,14 +1243,139 @@ to-code
 		# Step onward:
 		v9 += 3
 	again
-	v9 := 0
-
 	: load_level_get_enemies
 	# Also draws trash:
-	draw_obstacles
-	v9 := 0
+	# draw_obstacles
+
+	# This is only called once, why subroutine it:
+#: draw_obstacles
+	v0 := 0
+	i := 0x180
+	save vF
+
+	plane 2
+
+	:alias trash_counter v7
+	:alias other_trash_counter v8
+
+	mob_y := 0
+	loop
+		mob_x := 0
+		loop
+			v0 := mob_x
+			v1 := mob_y
+			address_game_cell
+
+			# v0 will be content
+			# v1 will be offset from game_grid
+
+			if v0 != -1 begin
+				mob_type := 128
+				mob_type += v0
+				# We do an overflow math check here without using vE I guess:
+				if vF == 1 begin	
+					# if the item was in the region at 128 or above:
+					# We know it's the index of something special
+
+					# We probably want the x8 version of this index:
+					v2 <<= mob_type # x2
+					v2 <<= v2 # x4
+					v2 <<= v2 # x8
+
+					# NO HIT obsticles that must not be hit:
+					if mob_type < 16 begin
+						plane 2
+						# furniture
+						calc_mob_draw_xy
+						i := long furniture
+						i += v2
+
+						sprite mob_draw_x mob_draw_y 8
+						jump draw_obstacles_pass_trash
+					end
+
+					# Trash items which must be cleared:
+					if mob_type < 32 begin
+						plane 1
+						calc_mob_draw_xy
+
+						v0 := mob_draw_x
+						v1 := mob_draw_y
+						i := long quick_trash
+						i += trash_counter
+
+						# This looks like it's going to save the draw X and draw Y position, as well graphic index
+						save v2
+
+						# Draw it because that makes things simpler:
+						i := long furniture
+						i += v2
+
+						sprite mob_draw_x mob_draw_y 8
+
+						v2 := other_trash_counter
+						calc_trash_ui_pos
+						sprite v0 v1 8
+
+						trash_counter += 3
+						other_trash_counter += 1
+					end
+				end
+
+				: draw_obstacles_pass_trash
+				vF := 8
+				f_delay
+			end
+
+			mob_x += 1
+			if mob_x != 7 then
+		again
+		mob_y += 1
+		if mob_y != 7 then
+	again
+
+	# We want to highlight the trash items for a bit here so the player knows to get them
+
+	# other_trash_counter contains the fixed number of trash items:
+
+	# How many passes do we want to do:
+	v4 := 10
+	flash_trash
+
+	i := 0x180
+	load vF
+#;
+
 #;
 }
+
+: flash_trash
+	plane 2
+	# This depends on knowing the total number, rather than checking the data
+	# If we check the data, we can do this any time we want, instead, including during gameplay
+	loop
+		v3 := 0
+		loop
+			i := long quick_trash
+			i += v3
+			load v2
+
+			if v2 != -1 begin
+				v0 += -4
+				v1 += -4
+				i := long ringus
+				sprite v0 v1 0
+			end
+			v3 += 3
+			if v3 != 27 then
+		again
+		vF := 3
+		f_delay
+		v4 += -1
+		if v4 != 0 then
+	again
+	plane 1
+;
 
 :alias enemy_data_size v7
 :alias enemy_data_simple_save v2
@@ -2072,6 +2217,9 @@ jump SetupOffPosX
 		jump game_restart
 	end
 
+	v4 := 4
+	flash_trash
+
 	# turn off collision check
 	#v5 := 0
 	# And restore the enemies:
@@ -2571,22 +2719,6 @@ jump SetupOffPosX
 	# vD mob_draw_x
 	# vE 
 
-	:alias mob_frame v2
-	:alias mob_x v3
-	:alias mob_y v4
-	# 8 bytes per mob
-	:alias mob_type v5
-	:alias mob_movement_index v6
-	:alias mob_speeder v7
-
-	:alias mob_infinite_loop_protection v8
-	:alias mob_movement_type vA
-	:alias mob_movement_subframe v9
-
-	:alias mob_data_spacing vB
-	:alias mob_draw_x vD
-	:alias mob_draw_y vC
-
 	i := frame_cycle_count
 	load v0
 
@@ -3032,98 +3164,6 @@ jump SetupOffPosX
 	v0 := -2
 	# v0 now has the value of this cell in it
 	# v1 now has the relative index to this cell in it
-;
-
-: draw_obstacles
-	v0 := 0
-
-	i := 0x180
-	save vF
-
-	plane 2
-
-	:alias trash_counter v7
-	:alias other_trash_counter v8
-
-	mob_y := 0
-	loop
-		mob_x := 0
-		loop
-			v0 := mob_x
-			v1 := mob_y
-			address_game_cell
-
-			# v0 will be content
-			# v1 will be offset from game_grid
-
-			if v0 != -1 begin
-				mob_type := 128
-				mob_type += v0
-				if vF == 1 begin	
-					# if the item was in the region at 128 or aboutve:
-					# We know it's the index of something special
-
-					# We probably want the x8 version of this index:
-					v2 <<= mob_type # x2
-					v2 <<= v2 # x4
-					v2 <<= v2 # x8
-
-					# NO HIT obsticles that must not be hit:
-					if mob_type < 16 begin
-						plane 2
-						# furniture
-						calc_mob_draw_xy
-						i := long furniture
-						i += v2
-
-						sprite mob_draw_x mob_draw_y 8
-						jump draw_obstacles_pass_trash
-					end
-
-					# Trash items which must be cleared:
-					if mob_type < 32 begin
-						plane 1
-						calc_mob_draw_xy
-
-						v0 := mob_draw_x
-						v1 := mob_draw_y
-						i := long quick_trash
-						i += trash_counter
-						save v2
-
-						# Draw it because that makes things simpler:
-						i := long furniture
-						i += v2
-
-						sprite mob_draw_x mob_draw_y 8
-
-						v2 := other_trash_counter
-						calc_trash_ui_pos
-						sprite v0 v1 8
-
-						trash_counter += 3
-						other_trash_counter += 1
-					end
-				end
-
-				: draw_obstacles_pass_trash
-				vF := 8
-				f_delay
-			end
-
-			mob_x += 1
-			if mob_x != 7 then
-		again
-		mob_y += 1
-		if mob_y != 7 then
-	again
-
-
-
-	plane 1
-
-	i := 0x180
-	load vF
 ;
 
 : calc_trash_ui_pos
