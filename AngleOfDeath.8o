@@ -1948,8 +1948,7 @@ to-code
 			sprite v0 v1 8
 
 			# Try to delay only one 60 fps frame most of the time:
-			vf := 1
-			f_delay
+			q_delay
 
 			# Undraw crosshair
 			sprite v0 v1 8
@@ -1971,8 +1970,7 @@ to-code
 			jump no_next_crosshair
 		end
 
-		vf := 1
-		f_delay
+		q_delay
 
 		: no_next_crosshair
 		next_crosshair += -1
@@ -2495,10 +2493,11 @@ jump SetupOffPosX
 		again
 
 		v0 := key
-
+		
 		i := load_level_number
 		# We must have completed this level
 		load vA - vA
+		vA += 1
 		# vA := v0
 
 		i := long level_select_last
@@ -2508,13 +2507,17 @@ jump SetupOffPosX
 		# v2: total levels competed
 		# v3: current chapter
 
-		vA += 1
-		v2 := vA
-		vA += 1
-		v1 := vA
+		# We only make progress if this is higher than our current:
+		if vA > v2 begin
+			v2 := vA
+			vA += 1
+			v1 := vA
+			# i := long level_select_last
+			save v0 - v3
+		end
 
-		# i := long level_select_last
-		save v0 - v3
+		
+
 
 		jump game_restart
 	end
