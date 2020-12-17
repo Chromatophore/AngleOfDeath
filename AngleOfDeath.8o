@@ -184,6 +184,39 @@ to-data
 0xFE 0x11 0x09 0x41 0x1E 0x37 0x14 0xF9 0x46 0x19 0xFE 0x23 0x18 0x14 0x00 0x5F
 0x23 0xFF 
 
+######
+#[1,17]stage
+#
+#par
+#
+#last
+#&
+#@
+#[94,17]high@
+#@
+#&
+#
+#low &
+#&
+#@
+#####
+
+: level_select_text
+0xFE 0x01 0x11 0x5A 0x5F 0x00 0x1E 0x14 0xFE 0x01 0x17 0xFE 0x01 0x1D 0x4B 0x00
+0x55 0xFE 0x01 0x23 0xFE 0x01 0x29 0x37 0x00 0x5A 0x5F 0xFE 0x01 0x2F 0xD7 0xFE
+0x01 0x35 0xDC 0xFE 0x5E 0x11 0x23 0x28 0x1E 0x23 0xDC 0xFE 0x5E 0x17 0xDC 0xFE
+0x5E 0x1D 0xD7 0xFE 0x5E 0x23 0xFE 0x5E 0x29 0x37 0x46 0x6E 0xF9 0xD7 0xFE 0x5E
+0x2F 0xD7 0xFE 0x5E 0x35 0xDC 0xFF 
+
+# [3,29]sweep
+# [3,56]&
+# [95,1]clean
+# [95,56]@
+
+: in_level_text
+0xFE 0x03 0x1D 0x5A 0x6E 0x14 0x14 0x4B 0xFE 0x03 0x38 0xD7 0xFE 0x5F 0x01 0x0A
+0x37 0x14 0x00 0x41 0xFE 0x5F 0x38 0xDC 0xFF 
+
 : sweeps_this_level
 0 
 
@@ -564,21 +597,21 @@ cross_x += off_axis
 0xC1 0x80 0xE3 0x80 0x77 0x00 0x3E 0x00 0x1C 0x00 0x3E 0x00 0x77 0x00 0xE3 0x80
 0xC1 0x80 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
 
-: qtex_clean
-0x7A 0x82 0x82 0x82 0x7B 0x0F 0x08 0x0E 0x08 0xEF 0x88 0x14 0x22 0x3E 0xA2 0x88
-0xCA 0xA8 0x9A 0x88
+#: qtex_clean
+#0x7A 0x82 0x82 0x82 0x7B 0x0F 0x08 0x0E 0x08 0xEF 0x88 0x14 0x22 0x3E 0xA2 0x88
+#0xCA 0xA8 0x9A 0x88
 
-: qtex_sweep
-0x7A 0x82 0x72 0x0A 0xF1 0x2F 0xA8 0xAF 0xA8 0x4F 0xBE 0x20 0x3C 0x20 0xBE 0xF0
-0x88 0xF0 0x80 0x80
+#: qtex_sweep
+#0x7A 0x82 0x72 0x0A 0xF1 0x2F 0xA8 0xAF 0xA8 0x4F 0xBE 0x20 0x3C 0x20 0xBE 0xF0
+#0x88 0xF0 0x80 0x80
 
-: qtex_rank
-0xF0 0x89 0xF2 0x93 0x8A 0x88 0x4C 0x2A 0xE9 0x28 0xA2 0xA4 0xB8 0xA4 0xA2 0x00
-0x00 0x00 0x00 0x00 
+#: qtex_rank
+#0xF0 0x89 0xF2 0x93 0x8A 0x88 0x4C 0x2A 0xE9 0x28 0xA2 0xA4 0xB8 0xA4 0xA2 0x00
+#0x00 0x00 0x00 0x00 
 
-: qtex_score
-0x79 0x82 0x72 0x0A 0xF1 0xE7 0x08 0x08 0x08 0xE7 0x3C 0xA2 0xBC 0xA4 0x22 0xF8
-0x80 0xF0 0x80 0xF8
+#: qtex_score
+#0x79 0x82 0x72 0x0A 0xF1 0xE7 0x08 0x08 0x08 0xE7 0x3C 0xA2 0xBC 0xA4 0x22 0xF8
+#0x80 0xF0 0x80 0xF8
 
 : block_cube
 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 
@@ -985,8 +1018,8 @@ fixed_graphic_def 27 18 fixed_graphic_angle_d
 	0x20 0x20 0x00 0x00 0x00 # '
 	0x00 0x00 0x70 0x00 0x00 # -
 	0x50 0x50 0x00 0x00 0x00 # "
-	0x00 0x00 0x00 0x00 0x00 # undefined
-	0x00 0x00 0x00 0x00 0x00 # undefined
+	0xA8 0xF8 0x20 0x20 0x20 # Sweeps
+	0xF8 0xA8 0xF8 0x70 0x70 # Skull points
 	0x00 0x00 0x00 0x00 0x00 # undefined
 	0x00 0x00 0x00 0x00 0x00 # undefined
 	0x00 0x00 0x00 0x00 0x00 # undefined
@@ -995,6 +1028,8 @@ fixed_graphic_def 27 18 fixed_graphic_angle_d
 	0x00 0x00 0x00 0x00 0x00 # undefined
 	0x00 0x00 0x00 0x00 0x00 # undefined
 
+
+ 
 
 # I think this means that our 0x200 address will be poluted with this this code rather than going right into main?
 # I don't know how to check.
@@ -1120,25 +1155,7 @@ to-code
 		if v2 != LL_Max8 then
 	again
 
-	v0 := 95
-	v1 := 1
-	i := long qtex_clean
-	qtex
-
-	v0 := 3
-	v1 := 29
-	i := long qtex_sweep
-	qtex
-
-	v0 := 3
-	v1 := 56
-	i := long qtex_rank
-	qtex
-
-	v0 := 96
-	v1 := 50
-	i := long qtex_score
-	qtex
+	ez_print in_level_text
 
 	i := long sweeper_platform_a
 	v0 := 0
@@ -2492,7 +2509,6 @@ jump SetupOffPosX
 
 	# if v7 is 0 then we got all the trash:
 	if v7 == 0 begin
-		:breakpoint level_complete
 		# We must have completed this level
 		# But what level was this level??
 		i := load_level_number
@@ -2529,18 +2545,40 @@ jump SetupOffPosX
 		# Last Score
 		v1 := v9
 		
-		# Max sweeps?
-		if v0 > v3 then v3 := v0
-		# Min sweeps?
+		# 3, 4 are a high SCORE record, with saved sweeps
+
+		# 5, 6 are a lowest sweeps record, with saved score
+
+		# fix this to match the way it should work
+		# Min sweeps, in 5 6
+		# if there's no saved record, this is always the new lowest!
 		if v5 == 0 then v5 := v0
-		if v0 < v5 then v5 := v0
+		# if this is a new or equal low:
+		if v0 <= v5 begin
+			# Save it:
+			v5 := v0
+			# And, is this a higher score?
+			# if so, save that!
+			if v1 > v6 then v6 := v1
+		end
+
 
 		# Max score?
-		if v1 > v4 then v4 := v1
-		# Min score?
-		if v6 == 0 then v6 := v1
-		if v1 < v6 then v6 := v1
+		# is it a tie?
+		if v1 == v4 begin
+			if v3 == 0 then v3 := v0
+			if v0 < v3 then v3 := v0
+			jump save_score_exit
+		end
+		# or is it a better score?
+		if v1 > v4 begin
 
+			# Save this highest score
+			v4 := v1
+			# Save thie sweeps with it
+			v3 := v0
+		end
+		: save_score_exit
 		# Now resave over the same data
 		save v0 - v7
 
@@ -3344,31 +3382,34 @@ jump SetupOffPosX
 	# Captures gameplay and allows the player to select a level
 	reset_for_new_game_loop
 
-	:alias current_level v8
+	:alias chapter_sublevel v8
 	:alias total_levels_unlocked v9
 	:alias total_levels_complete vA
 	:alias current_chapter vB
+	# mob_draw_x & y are vC and vD
 
 	i := long level_select_last
-	load current_level - current_chapter
-
+	load chapter_sublevel - current_chapter
 
 	:alias chapter_offset v7
 	i := long mul_8
 	i += current_chapter
 	# We now know where to index into chapters
 	load chapter_offset - chapter_offset
+	# Chapter Offset is the memory offset to the start of the chapter that we're in
 
-	
+	# We can reuse vB because we do not need to use current_chapter past this point
+	:alias ls_maximum_right vB
 
 	# First, draw the layout:
 	mob_draw_x := 0
 	mob_draw_y := 1
 
+	# v4 and v5 become available after this first loop
 	:alias completed_levels_drawn v4
-	:alias highest_current_level v5
+
 	completed_levels_drawn := 0
-	highest_current_level := 0
+	ls_maximum_right := 0
 
 	# v6 will be our selection within the chapter:
 	:alias ls_cur v6
@@ -3382,6 +3423,8 @@ jump SetupOffPosX
 
 		load v0
 		# What are we looking at here:
+
+		# -1 is the 'beginning' of the game, marked with a dot
 		if v0 == -1 begin
 			mob_draw_x += 4
 			i := long level_select_marker_first
@@ -3390,16 +3433,22 @@ jump SetupOffPosX
 			jump lv_select_end_loop
 		end
 
+		# If v0 is in this region, then it is a chapter change button at the start or end of a chapter
 		if v0 >= 0x80 begin
+			# This must be at the end:
 			if ls_cur == 7 begin
+				# If we have not drawn 6 complete levels this chapter, we can't proceed:
 				if completed_levels_drawn != 6 then	jump lv_select_end_loop
 
 				i := long padded_line_h
 				sprite mob_draw_x mob_draw_y 4
 				mob_draw_x += 8
 				i := long level_select_marker_next
-			end
 
+				# We can also select this entry now:
+				ls_maximum_right := ls_cur
+			end
+			# This must be at the start:
 			if ls_cur == 0 begin
 				mob_draw_x += 4
 				i := long level_select_marker_prev
@@ -3409,48 +3458,91 @@ jump SetupOffPosX
 			mob_draw_x += 8
 		end
 
+		# Is this level number unlocked?
 		if v0 < total_levels_unlocked begin
-			# This level is completed
+
 			i := long padded_line_h
 			sprite mob_draw_x mob_draw_y 4
 			mob_draw_x += 8
 			i := long level_select_marker
 			sprite mob_draw_x mob_draw_y  8
 
+			# Is this level also completed?
 			if v0 < total_levels_complete begin
 				completed_levels_drawn += 1
 				i := long level_select_complete
 				sprite mob_draw_x mob_draw_y  8
 			end
 
+			ls_maximum_right := ls_cur
+
 			mob_draw_x += 8
 		end
-
-		highest_current_level := ls_cur
 
 		: lv_select_end_loop
 		ls_cur += 1
 		if ls_cur != 8 then
 	again
 
-	highest_current_level += 1
+	# Since this value is 'corrective', we add 1 to catch the overshoot:
+	ls_maximum_right += 1
 
+	# And we often loop back here:
 	: level_select_move_select_arrow
-	# Actual select loop:
-	# Use current 0 - 8 to select what we're looking at:
 
-	# Multiply current level by 16:
+	# if we have moved, we need to 'undraw' our stats
+	# if it's our first time here, we do not need to undraw them
+	# A conundrum!
+
+	# Let's solve it by simply drawing a square where the stats would be
+	# If they're there, we will undraw them
+	# how silly!
+	v0 := 0
+	v1 := 48
+	i := long block_cube
+	sprite v0 v1 8
+	v2 := vF
+	sprite v0 v1 8
+	if v2 != 0 then draw_level_select_stats
+
+
+	:alias ls_true_level_number v5
+
+	if chapter_sublevel == -1 then chapter_sublevel := 0
+	if chapter_sublevel == ls_maximum_right then chapter_sublevel -= 1
+
+	# Load the true level number that we have selected:
+	i := long chapters
+	i += chapter_offset
+	i += chapter_sublevel
+	load ls_true_level_number - ls_true_level_number
+
+	# Actual select loop:
+	# Use chapter_sublevel 0 - 7 to select what we're looking at:
+
+	# Multiply our sublevel by 16:
 	i := long mul_8
-	i += current_level
+	i += chapter_sublevel
 	load v0
-	v0 += v0
-	# And add 4, for the X offset:
-	v0 += 4
+
 	mob_draw_x := v0
+	mob_draw_x += mob_draw_x
+	# And add 4, for the X offset:
+	mob_draw_x += 4
 	mob_draw_y := 9
 	# Draw the selection arrow:
 	i := long level_select_pointer
 	sprite mob_draw_x mob_draw_y 8
+
+	if chapter_sublevel == 0 then jump ls_skip_score_display
+	if chapter_sublevel == 7 then jump ls_skip_score_display
+
+	# We can only go as high as v4, this gives us 5 registers to work with.
+	# If we're going to draw text and such like, I think it's probably wise to stash our registers:
+
+	draw_level_select_stats
+
+	: ls_skip_score_display
 
 	: level_select_reject_input
 	i := long level_select_pointer
@@ -3458,72 +3550,130 @@ jump SetupOffPosX
 	# Take input into v0:
 	v0 := key
 
-
 	# Left
 	if v0 == 7 begin
+		# Remove Arrow:
 		sprite mob_draw_x mob_draw_y  8
-		
-		current_level += -1
-		if current_level == -1 then current_level := 0
-
+		chapter_sublevel += -1
 		jump level_select_move_select_arrow
 	end
 
 	# Right
 	if v0 == 9 begin
+		# Remove Arrow:
 		sprite mob_draw_x mob_draw_y  8
-		
-		current_level += 1
-
-		i := long chapters
-		i += chapter_offset
-		i += current_level
-		load v0
-
-		if v0 == total_levels_unlocked then current_level -= 1
-
-		if current_level == highest_current_level then current_level -= 1
-		if current_level == 8 then current_level := 7
-
-
+		chapter_sublevel += 1
 		jump level_select_move_select_arrow
 	end
-	if v0 == 0xE begin
-		# F
-		i := long chapters
-		i += chapter_offset
-		i += current_level
-		load v0
 
-		if v0 == -1 then jump level_select_reject_input
+	# Pulling the trigger:
+	if v0 == 0xE begin
+
+		if ls_true_level_number == -1 then jump level_select_reject_input
 
 		# Change chapter
-		if v0 >= 0x80 begin
-			v0 -= 0x80
-			current_chapter := v0
+		if ls_true_level_number >= 0x80 begin
+			ls_true_level_number -= 0x80
+			current_chapter := ls_true_level_number
 
-			if current_level == 0 then current_level := 6
-			if current_level == 7 then current_level := 1
+			if chapter_sublevel == 0 then chapter_sublevel := 6
+			if chapter_sublevel == 7 then chapter_sublevel := 1
 
 			i := long level_select_last
-			save current_level - current_chapter
+			save chapter_sublevel - current_chapter
+
+			# This invalidates ls_maximum_right, but, that's ok because we are
+			# going to regenerate it due to chapter change:
 			jump level_select_mode
 		end
 
-		# Otherwise we select this level:
-
-		v1 := v0
-
+		# Otherwise we select this level to play
+		# First we save which level in the chapter we're doing:
 		i := long level_select_last
-		save current_level - current_level
+		save chapter_sublevel - chapter_sublevel
 
 		# Save the level to play into the appropriate location:
 		i := load_level_number
-		save v1 - v1
+		save ls_true_level_number - ls_true_level_number
 
 		return
 	end
 	jump level_select_reject_input
+
+: draw_level_select_stats
+	i := long register_dump
+	save vF
+
+	# Can we display the stats associated with this level
+	# We need to know what actual level we are actually looking at here
+
+	# index to score table for this level:
+	# We mul_4 the true level, giving us 64 true levels:
+	v0 <<= ls_true_level_number
+	v0 <<= v0
+	# Then we add this twice.
+	# This is because we likely will have > 32 levels
+	i := long levels_saved_scores
+	i += v0
+	i += v0
+
+#   7           8            9                a      b                       c           d
+# Last Sweeps				 Sweep Par				Player Score Max 					Player Score Min
+# 				Last Score					  Player Sweeps Max				  Player Sweeps Min
+
+	# Our regiters are stashed so we can do whatever we want now
+	# we will be using v0, v1 and v2 to draw numbers
+	# And we will be messing up our I pointer
+	load v7 - vE
+
+	v1 := 17
+	v2 := 23
+	v0 := 0
+	q_dig
+
+	# ls_true_level_number is v5:
+	v0 := ls_true_level_number
+	v0 += 1
+	draw_bcd_v1v2
+
+	v2 += 12
+	v0 := v9
+	q_dig
+
+	v2 += 12
+	v0 := v7
+	q_dig
+
+	v2 += 6
+	v1 -= 12
+	v0 := v8
+	draw_bcd_v1v2
+
+	v1 := 110
+	v2 := 23
+
+	v0 := vB
+	draw_bcd_v1v2
+
+	v1 := 110
+	v0 := vD
+	v2 := 53
+	draw_bcd_v1v2
+
+	v0 := vA
+	v2 := 29
+	q_dig
+
+	v0 := vC
+	v2 := 47
+	q_dig
+
+	ez_print level_select_text
+
+	# Restore registers:
+	i := long register_dump
+	load vF
+;
 
 : increase_sweeps
 	
@@ -3548,28 +3698,28 @@ jump SetupOffPosX
 ;
 
 : draw_score
+	v1 := 108
+	v2 := 56
 	i := long score_this_level
 	load v0
 
-	i := 0x170
+: draw_bcd_v1v2
+
+	i := simple_bcd_values
 	bcd v0
 
 	load v0
-	v1 := 108
-	v2 := 56
 	q_dig
 
-	i := 0x171
+	i := simple_bcd_values_plus1
 	load v0
 	v1 += 6
 	q_dig
 
-	i := 0x172
+	i := simple_bcd_values_plus2
 	load v0
 	v1 += 6
 	q_dig
-
-	:monitor 0x170 3
 ;
 
 : q_dig
@@ -3581,6 +3731,12 @@ jump SetupOffPosX
 	sprite v1 v2 5
 ;
 
+: simple_bcd_values
+	0 
+: simple_bcd_values_plus1
+	0
+: simple_bcd_values_plus2
+	0
 
 
 
