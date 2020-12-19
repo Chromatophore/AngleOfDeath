@@ -21,6 +21,14 @@
 # Spirit Reaping
 # Ending
 
+#5 dogs? 5 Areas?
+
+#Living Room
+#Dining Room
+#Library
+#Bed Room
+#Basement
+
 :alias Tx  vD	# target X
 :alias Ty  vC	# target Y
 :alias Tr  vB   # Rotation
@@ -167,7 +175,10 @@
 :macro to-code { :calc DATA_POS { HERE }  :org { CODE_POS } }
 :macro to-data { :calc CODE_POS { HERE }  :org { DATA_POS } }
 
-
+:macro unpack_to_rom ADDRESS {
+	:byte { 0xFF & ADDRESS >> 8 }
+	:byte { 0xFF & ADDRESS }
+}
 
 ##############################
 # So I have had to impliment to-data, and to-code in order to continue working on this project
@@ -202,11 +213,13 @@ to-data
 #####
 
 : level_select_text
-0xFE 0x01 0x11 0x5A 0x5F 0x00 0x1E 0x14 0xFE 0x01 0x17 0xFE 0x01 0x1D 0x4B 0x00
-0x55 0xFE 0x01 0x23 0xFE 0x01 0x29 0x37 0x00 0x5A 0x5F 0xFE 0x01 0x2F 0xD7 0xFE
-0x01 0x35 0xDC 0xFE 0x5E 0x11 0x23 0x28 0x1E 0x23 0xDC 0xFE 0x5E 0x17 0xDC 0xFE
-0x5E 0x1D 0xD7 0xFE 0x5E 0x23 0xFE 0x5E 0x29 0x37 0x46 0x6E 0xF9 0xD7 0xFE 0x5E
-0x2F 0xD7 0xFE 0x5E 0x35 0xDC 0xFF 
+0xFE 0x01 0x11 0x5A 0x5F 0x00 0x1E 0x14 0xFE 0x01 0x1D 0x4B 0x00 0x55 0xFF 
+
+: level_select_stats_text
+0xFE 0x01 0x29 0x37 0x00 0x5A 0x5F 0xFE 0x01 0x2F 0xD7 0xFE 0x01 0x35 0xDC 0xFE
+0x5E 0x11 0x23 0x28 0x1E 0x23 0xDC 0xFE 0x5E 0x17 0xDC 0xFE 0x5E 0x1D 0xD7 0xFE
+0x5E 0x29 0x37 0x46 0x6E 0xF9 0xD7 0xFE 0x5E 0x2F 0xD7 0xFE 0x5E 0x35 0xDC 0xFF
+
 
 # [3,29]sweep
 # [3,56]&
@@ -216,6 +229,44 @@ to-data
 : in_level_text
 0xFE 0x03 0x1D 0x5A 0x6E 0x14 0x14 0x4B 0xFE 0x03 0x38 0xD7 0xFE 0x5F 0x01 0x0A
 0x37 0x14 0x00 0x41 0xFE 0x5F 0x38 0xDC 0xFF 
+
+###################
+# Chapter graphics
+
+# Tutorial garden:
+: chapter_art_0
+0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x01 0x02 0x02 0x04 0x04 0x08 0x08
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x80 0x80 0x40 0x40 0x20 0x20
+0x00 0x00 0x00 0x00 0x00 0x00 0x04 0x04 0x0A 0x0A 0x11 0x11 0x20 0x20
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x80 0x80
+0x01 0x02 0x02 0x02 0x02 0x02 0x01 0x03 0x02 0x02 0x1F 0x10 0x10 0x10
+0x04 0x8A 0x91 0xE0 0x40 0x80 0x00 0xFF 0x00 0x00 0x80 0x80 0x80 0x8F
+0x00 0x00 0xFC 0x84 0x44 0x24 0x14 0xFC 0x04 0x04 0x1F 0x10 0x10 0x10
+0x0F 0x01 0x01 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0xE0 0x00 0x00 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x3F 0x04 0x04 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x03 0x3F 0x7E 0x7F
+0x80 0x00 0x00 0xFF 0x00 0x00 0x00 0x00 0x0F 0xFF 0xF0 0x80 0x00 0x80
+0x10 0x10 0x10 0xFF 0x00 0x03 0x0F 0x7F 0xF0 0x80 0x00 0x00 0x00 0x00
+0x89 0x89 0x89 0xFF 0x3F 0xFC 0xE0 0x80 0x00 0x00 0x00 0x00 0x00 0x00
+0x10 0x10 0x10 0xFF 0x80 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x00 0x00 0x00 0x08 0x14 0x22 0x7F 0x41 0x41 0x41 0x4D 0x4D 0x4D
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x3F 0xFF
+0x1F 0x03 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x0F 0xFF 0xFF 0xFC
+0xE0 0xFC 0xFF 0x0F 0x07 0x01 0x01 0x07 0x07 0x3F 0xFE 0xF0 0xE0 0x00
+0x00 0x00 0x80 0xE0 0xF0 0xF8 0xFC 0xF8 0xF0 0xE0 0x00 0x00 0x00 0x00
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+
+
+
+
+
+
+
+: chapter_art_addresses
+# 0:
+unpack_to_rom chapter_art_0
+
 
 : sweeps_this_level
 0 
@@ -255,7 +306,7 @@ to-data
 # 2: total levels competed
 # 3: current chapter
 : level_select_last
- 1 14 14 0 0 0 0
+ 1 1 0 0 0 0 0
 
 # Last Sweeps				 Sweep Par				Player Score Max 					Player Score Min
 # 				Last Score					  Player Sweeps Max				  Player Sweeps Min
@@ -1029,7 +1080,8 @@ fixed_graphic_def 27 18 fixed_graphic_angle_d
 	0x00 0x00 0x00 0x00 0x00 # undefined
 
 
- 
+ : string_stash
+  0 0 0 0 0 0
 
 # I think this means that our 0x200 address will be poluted with this this code rather than going right into main?
 # I don't know how to check.
@@ -1074,6 +1126,8 @@ to-code
 ;
 : print-string
 	# stash registers here if you need to protect up to v5
+	i := long string_stash
+	save v5
 	i := print-string-read
 	save v1
 	string-offset := 0
@@ -1095,6 +1149,8 @@ to-code
 		print-char
 	again
 	# And restoring strings here if needed
+	i := long string_stash
+	load v5
 ;
 
 ###############################
@@ -1121,39 +1177,14 @@ to-code
 #: draw_game_box
 :macro draw_game_box
 {
-	v0 := UL_X
-
 	v1 := UL_Y
 	v2 := LL_Y
 
-	i := long line_h
-
-	loop
-		sprite v0 v1 1
-		sprite v0 v2 1
-
-		v0 += 8
-		if v0 != UR_Max8 then
-	again
-
-	i := long line_h_2
-	sprite v0 v1 1
-	sprite v0 v2 1
-
+	draw_paired_lines_h
 	
-	v0 := UL_X
-	v1 := UR_X
 	v2 := UL_Y_plus1
 
-	i := long line_v
-
-	loop
-		sprite v0 v2 8
-		sprite v1 v2 8
-
-		v2 += 8
-		if v2 != LL_Max8 then
-	again
+	draw_paired_lines_v
 
 	ez_print in_level_text
 
@@ -1169,6 +1200,36 @@ to-code
 #;
 }
 
+: draw_paired_lines_h
+	v0 := UL_X
+	i := long line_h
+
+	loop
+		sprite v0 v1 1
+		sprite v0 v2 1
+
+		v0 += 8
+		if v0 != UR_Max8 then
+	again
+
+	i := long line_h_2
+	sprite v0 v1 1
+	sprite v0 v2 1
+;
+
+: draw_paired_lines_v
+	v0 := UL_X
+	v1 := UR_X
+
+	i := long line_v
+	loop
+		sprite v0 v2 8
+		sprite v1 v2 8
+
+		v2 += 8
+		if v2 != LL_Max8 then
+	again
+;
 
 #: load_level
 :macro load_level
@@ -3378,18 +3439,86 @@ jump SetupOffPosX
 	: skip_annoying_math
 ;
 
+:macro draw_chapter_art
+{
+
+	# Draw the box that surrounds the chapter art:
+	v1 := 17
+	v2 := LL_Y
+
+	draw_paired_lines_h
+	i := long line_v
+	v0 += 1
+	v1 += 1
+	sprite v0 v1 2
+	v0 := UL_X
+	sprite v0 v1 2
+
+	v2 := 20
+	draw_paired_lines_v
+
+	i := long chapter_art_addresses
+	i += current_chapter
+	i += current_chapter
+	load v1
+
+	i := draw_chapter_art_sprite_start
+	save v1
+
+	# point at sprite start:
+	0xF0 0
+	: draw_chapter_art_sprite_start
+			0 0
+
+	# Sprite is 7x3 8x14 sprites
+	# Start is 36 18
+
+	:calc chapter_art_start_x { 36 }
+	:calc chapter_art_start_y { 18 }
+
+	:calc chapter_art_width { 8 }
+	:calc chapter_art_height { 14 }
+
+	:calc chapter_art_end_x { chapter_art_start_x + 7 * chapter_art_width }
+	:calc chapter_art_end_y { chapter_art_start_y + 3 * chapter_art_height }
+
+	# Bytes to step I on by:
+	plane 2
+	v2 := 14
+	v1 := chapter_art_start_y
+	loop
+		v0 := chapter_art_start_x
+		loop
+			sprite v0 v1 14
+			i += v2
+			v0 += chapter_art_width
+
+			if v0 != chapter_art_end_x then
+		again
+
+		v1 += chapter_art_height
+		if v1 != chapter_art_end_y then
+	again
+	plane 1
+#;
+}
+
 : level_select_mode
 	# Captures gameplay and allows the player to select a level
 	reset_for_new_game_loop
+	# no registers matter on entry to this area.
+	# The screen also is wiped
 
 	:alias chapter_sublevel v8
-	:alias total_levels_unlocked v9
-	:alias total_levels_complete vA
+	# :alias total_levels_unlocked v9
+	# :alias total_levels_complete vA
 	:alias current_chapter vB
 	# mob_draw_x & y are vC and vD
 
 	i := long level_select_last
 	load chapter_sublevel - current_chapter
+
+	draw_chapter_art
 
 	:alias chapter_offset v7
 	i := long mul_8
@@ -3459,7 +3588,8 @@ jump SetupOffPosX
 		end
 
 		# Is this level number unlocked?
-		if v0 < total_levels_unlocked begin
+		# if v0 < total_levels_unlocked begin
+		if v0 < v9 begin
 
 			i := long padded_line_h
 			sprite mob_draw_x mob_draw_y 4
@@ -3468,7 +3598,8 @@ jump SetupOffPosX
 			sprite mob_draw_x mob_draw_y  8
 
 			# Is this level also completed?
-			if v0 < total_levels_complete begin
+			# if v0 < total_levels_complete begin
+			if v0 < vA begin
 				completed_levels_drawn += 1
 				i := long level_select_complete
 				sprite mob_draw_x mob_draw_y  8
@@ -3484,38 +3615,38 @@ jump SetupOffPosX
 		if ls_cur != 8 then
 	again
 
-	# Since this value is 'corrective', we add 1 to catch the overshoot:
-	ls_maximum_right += 1
+	# This gives us a rendered 'chapter'
+
+	##############################################
+	##############################################
+	# This is our point of separation for many register fields
+	# total_levels_unlocked is available
+	# v9
+	# total_levels_complete is available
+	# vA
+
+	:alias ls_stats_displayed_status vA
+	ls_stats_displayed_status := 0
 
 	# And we often loop back here:
 	: level_select_move_select_arrow
 
-	# if we have moved, we need to 'undraw' our stats
-	# if it's our first time here, we do not need to undraw them
-	# A conundrum!
-
-	# Let's solve it by simply drawing a square where the stats would be
-	# If they're there, we will undraw them
-	# how silly!
-	v0 := 0
-	v1 := 48
-	i := long block_cube
-	sprite v0 v1 8
-	v2 := vF
-	sprite v0 v1 8
-	if v2 != 0 then draw_level_select_stats
-
-
+	# We will store the 'true' number of this level somewhere, and that somewhere
+	# should be below v7, because we use our high registers in draw_level_select_stats
+	# However we also stash them all, so, our current values should be maintained
 	:alias ls_true_level_number v5
 
-	if chapter_sublevel == -1 then chapter_sublevel := 0
-	if chapter_sublevel == ls_maximum_right then chapter_sublevel -= 1
-
-	# Load the true level number that we have selected:
+	# Populate this value:
 	i := long chapters
 	i += chapter_offset
 	i += chapter_sublevel
 	load ls_true_level_number - ls_true_level_number
+
+	# My goal is to persist the text if we need it still, so that
+	# we don't undraw things we don't need to
+	# This function requires ls_true_level_number be valid
+	draw_level_select_stats_only
+	draw_level_select_stats_text_only
 
 	# Actual select loop:
 	# Use chapter_sublevel 0 - 7 to select what we're looking at:
@@ -3534,41 +3665,38 @@ jump SetupOffPosX
 	i := long level_select_pointer
 	sprite mob_draw_x mob_draw_y 8
 
-	if chapter_sublevel == 0 then jump ls_skip_score_display
-	if chapter_sublevel == 7 then jump ls_skip_score_display
-
 	# We can only go as high as v4, this gives us 5 registers to work with.
 	# If we're going to draw text and such like, I think it's probably wise to stash our registers:
 
-	draw_level_select_stats
-
-	: ls_skip_score_display
-
+	# We do a simple input loop here:
 	: level_select_reject_input
-	i := long level_select_pointer
-
 	# Take input into v0:
 	v0 := key
-
 	# Left
 	if v0 == 7 begin
-		# Remove Arrow:
+		if chapter_sublevel == 0 then jump level_select_reject_input
 		sprite mob_draw_x mob_draw_y  8
+		# Needs to happen before the sublevel changes?
+		draw_level_select_stats_only
 		chapter_sublevel += -1
+
 		jump level_select_move_select_arrow
 	end
 
 	# Right
 	if v0 == 9 begin
-		# Remove Arrow:
+		if chapter_sublevel == ls_maximum_right then jump level_select_reject_input
+
 		sprite mob_draw_x mob_draw_y  8
+		# Needs to happen before the sublevel changes?
+		draw_level_select_stats_only
 		chapter_sublevel += 1
+
 		jump level_select_move_select_arrow
 	end
 
 	# Pulling the trigger:
 	if v0 == 0xE begin
-
 		if ls_true_level_number == -1 then jump level_select_reject_input
 
 		# Change chapter
@@ -3580,7 +3708,9 @@ jump SetupOffPosX
 			if chapter_sublevel == 7 then chapter_sublevel := 1
 
 			i := long level_select_last
-			save chapter_sublevel - current_chapter
+			save chapter_sublevel - chapter_sublevel
+			load v2
+			save current_chapter - current_chapter
 
 			# This invalidates ls_maximum_right, but, that's ok because we are
 			# going to regenerate it due to chapter change:
@@ -3600,9 +3730,53 @@ jump SetupOffPosX
 	end
 	jump level_select_reject_input
 
-: draw_level_select_stats
+: draw_level_select_stats_text_only
+	# Our normal goal is 2, and received in mob_draw_x
+
+	if chapter_sublevel == 0 then mob_draw_x := 0
+	if chapter_sublevel == 7 then mob_draw_x := 0
+
+	#mob_draw_x := 0
+	#mob_draw_y := 0
+	# if we are already at our goal, then, return:
+	if mob_draw_x == ls_stats_displayed_status then return
+
+	# I did a weird truth table thing for this and it turns out there's a way 'faster' way to do this:
+
+#	if v6 == 0 begin
+#		if ls_stats_displayed_status == 2 then mob_draw_x := 1
+#		mob_draw_y := 1
+#	end
+
+#	if v6 == 2 begin
+#		if ls_stats_displayed_status != 1 then mob_draw_y := 1
+#		mob_draw_x := 1
+	#end
+
+	#if v6 == 1 begin
+	#	if ls_stats_displayed_status == 2 then mob_draw_x := 1
+	#	if ls_stats_displayed_status == 0 then mob_draw_y := 1
+	#end
+
+	v6 := mob_draw_x
+	mob_draw_x += ls_stats_displayed_status
+	ls_stats_displayed_status := v6
+
+	if mob_draw_x != 1 begin
+		ez_print level_select_stats_text
+	end
+
+	if mob_draw_x != 3 begin
+		ez_print level_select_text
+	end
+;
+
+: draw_level_select_stats_only
+	if chapter_sublevel == 0 then return
+	if chapter_sublevel == 7 then return
+
 	i := long register_dump
-	save vF
+	save vB
 
 	# Can we display the stats associated with this level
 	# We need to know what actual level we are actually looking at here
@@ -3640,6 +3814,13 @@ jump SetupOffPosX
 	v0 := v9
 	q_dig
 
+	# Then We only draw these if the player has completed it:
+
+	if vB == 0 begin
+		mob_draw_x := 1
+		jump level_select_stats_not_complete
+	end
+
 	v2 += 12
 	v0 := v7
 	q_dig
@@ -3668,11 +3849,11 @@ jump SetupOffPosX
 	v2 := 47
 	q_dig
 
-	ez_print level_select_text
-
+	mob_draw_x := 2
+	: level_select_stats_not_complete
 	# Restore registers:
 	i := long register_dump
-	load vF
+	load vB
 ;
 
 : increase_sweeps
