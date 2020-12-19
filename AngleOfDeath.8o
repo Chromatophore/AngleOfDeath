@@ -327,6 +327,15 @@ a_level_save  9 4
 a_level_save 10 4
 a_level_save 11 4
 
+: levels_char_position
+# Comment is 'stage' number:
+40 44 0 # 1
+53 42 0 # 2
+62 37 0 # 3
+52 31 32 # 4
+59 25 0 # 5
+71 22 0 # 6
+
 # Ironically it's much easier for us to define vertical columns in memory
 # I fixed it now the game grid makes sense
 : game_grid_stride
@@ -596,6 +605,15 @@ cross_x += off_axis
 : use_crosshair
 0 0 0 0 0 0 0 0
 
+: sublevel_arrow_start
+  4
+ 20
+ 36
+ 52
+ 68
+ 84
+100
+116
 
 : mul_8
 : mob_spacing
@@ -921,6 +939,12 @@ mpat_8  1 -1
 0x07 0xE0 0x1F 0xF8 0x3F 0xFC 0x7C 0x3E 0x70 0x0E 0xF0 0x0F 0xE0 0x07 0xE0 0x07
 0xE0 0x07 0xE0 0x07 0xF0 0x0F 0x70 0x0E 0x7C 0x3E 0x3F 0xFC 0x1F 0xF8 0x07 0xE0
 
+: sweeper_nothing_flip
+0x00 0x00 0x00 0x00 0x18 0x00 0x18 0x00 0x18 0x00 0x1B 0xE0 0x1F 0xF0 0x17 0x50
+0x17 0x50 0x13 0xF0 0x1F 0xE0 0x1F 0xC0 0x1F 0xE0 0x17 0xE0 0x17 0xE0 0x3F 0xF0
+0x00 0x00 0x00 0x00 0x00 0x18 0x00 0x18 0x00 0x18 0x07 0xD8 0x0F 0xF8 0x0A 0xE8
+0x0A 0xE8 0x0F 0xC8 0x07 0xF8 0x03 0xF8 0x07 0xF8 0x07 0xE8 0x07 0xE8 0x0F 0xFC
+
 
 : sweeper_walk_broom
 0x00 0x00 0xAA 0x00 0xFE 0x00 0x7C 0x00 0x10 0x00 0x13 0xE0 0x17 0xF0 0x17 0x50
@@ -969,7 +993,6 @@ mpat_8  1 -1
 : fixed_graphic_angle_d
 0xF8 0x00 0x84 0x00 0xB2 0x00 0xAA 0x00 0xAA 0x00 0xAA 0x00 0xAA 0x00 0xAA 0x00
 0xB2 0x00 0x84 0x00 0xF8 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-
 
 :macro data_sprite x {
 	v0 := x
@@ -3651,15 +3674,17 @@ jump SetupOffPosX
 	# Actual select loop:
 	# Use chapter_sublevel 0 - 7 to select what we're looking at:
 
-	# Multiply our sublevel by 16:
-	i := long mul_8
-	i += chapter_sublevel
-	load v0
+	draw_level_select_mainchar
 
-	mob_draw_x := v0
-	mob_draw_x += mob_draw_x
+	# Multiply our sublevel by 16:
+	i := long sublevel_arrow_start
+	i += chapter_sublevel
+	load mob_draw_x - mob_draw_x
+
+	#mob_draw_x := v0
+	#mob_draw_x += mob_draw_x
 	# And add 4, for the X offset:
-	mob_draw_x += 4
+	#mob_draw_x += 4
 	mob_draw_y := 9
 	# Draw the selection arrow:
 	i := long level_select_pointer
@@ -3678,6 +3703,7 @@ jump SetupOffPosX
 		sprite mob_draw_x mob_draw_y  8
 		# Needs to happen before the sublevel changes?
 		draw_level_select_stats_only
+		draw_level_select_mainchar
 		chapter_sublevel += -1
 
 		jump level_select_move_select_arrow
@@ -3690,8 +3716,9 @@ jump SetupOffPosX
 		sprite mob_draw_x mob_draw_y  8
 		# Needs to happen before the sublevel changes?
 		draw_level_select_stats_only
+		draw_level_select_mainchar
 		chapter_sublevel += 1
-
+		
 		jump level_select_move_select_arrow
 	end
 
@@ -3729,6 +3756,21 @@ jump SetupOffPosX
 		return
 	end
 	jump level_select_reject_input
+
+: draw_level_select_mainchar
+	if chapter_sublevel == 0 then return
+	if chapter_sublevel == 7 then return
+
+	i := long levels_char_position
+	i += ls_true_level_number
+	i += ls_true_level_number
+	i += ls_true_level_number
+	load v2
+	# these are now the coords
+	i := long sweeper_nothing_flip
+	i += v2
+	sprite v0 v1 0
+;
 
 : draw_level_select_stats_text_only
 	# Our normal goal is 2, and received in mob_draw_x
