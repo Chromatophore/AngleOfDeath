@@ -87,6 +87,8 @@
 :calc player_TOP_LIMIT { UL_Y + 3 }
 :calc player_LOW_LIMIT { LL_Y - 3 }
 
+:const lowmem_register_stash 0x180
+
 #########
 #
 # The big redo
@@ -306,7 +308,9 @@ unpack_to_rom chapter_art_0
 # 2: total levels competed
 # 3: current chapter
 : level_select_last
- 1 1 0 0 0 0 0
+ 1 
+ : level_select_flagsave 
+ 	1 0 0 0 0 0
 
 # Last Sweeps				 Sweep Par				Player Score Max 					Player Score Min
 # 				Last Score					  Player Sweeps Max				  Player Sweeps Min
@@ -355,27 +359,6 @@ a_level_save 11 4
 0 0 0   0 0 0   0
 
 :monitor quick_trash 28
-
-# I would waste so much memory just writing out the levels
-# like this but at least I can see them and decide if they're good
-
-# These are 4 bytes:
-: levels_load
-# 0
- i := long level_lr_1
- i := long level_lr_2
- i := long level_lr_3
- i := long level_lr_4
- i := long level_lr_5
- i := long level_lr_6
-
-: enemies_load
- i := long level_lr_1_enemy
- i := long level_lr_2_enemy
- i := long level_lr_3_enemy
- i := long level_lr_4_enemy
- i := long level_lr_5_enemy
- i := long level_lr_6_enemy
 
 : level_reset_data
 -1		-1		-1		-1		-1		-1		-1
@@ -525,27 +508,59 @@ tr 15	1	5
 
 : level_lr_1_enemy
 	8
-		8 0 0 0 8 8 0 8 
+		8 0 0 0
+		8 8 0 8 
 
 : level_lr_2_enemy
 	12
-		8 8 16 32 24 16 24 8 16 24 32 32 
+		8 8 16 32
+		24 16 24 8
+		16 24 32 32
 
 : level_lr_3_enemy
 	12
-		40 40 24 24 24 32 24 32 0 0 24 24 
+		40 40 24 24
+		24 32 24 32
+		0 0 24 24
 
 : level_lr_4_enemy
 	11
-		56 32 0 56 0 0 56 32 32 32 56 
+		56 32 0 56
+		0 0 56 32
+		32 32 56 
 
 : level_lr_5_enemy
 	9
-		16 24 40 40 24 16 16 16 40 
+		16 24 40 40
+		24 16 16 16
+		40 
 
 : level_lr_6_enemy
 	10
-		64 48 64 16 16 48 48 16 64 64 
+		64 48 64 16
+		16 48 48 16
+		64 64 
+
+
+
+# These are 2 bytes:
+: levels_load
+# 0
+unpack_to_rom level_lr_1
+unpack_to_rom level_lr_2
+unpack_to_rom level_lr_3
+unpack_to_rom level_lr_4
+unpack_to_rom level_lr_5
+unpack_to_rom level_lr_6
+
+: enemies_load
+unpack_to_rom level_lr_1_enemy
+unpack_to_rom level_lr_2_enemy
+unpack_to_rom level_lr_3_enemy
+unpack_to_rom level_lr_4_enemy
+unpack_to_rom level_lr_5_enemy
+unpack_to_rom level_lr_6_enemy
+
 
 # Let's decide that a level is defined in memory entirely as a grid
 # and we draw in obsticles with negative numbers
@@ -1258,19 +1273,32 @@ to-code
 :macro load_level
 {
 	# level is in... v0?
+	v2 := v0
 
-	# This is the stupid way of loading a level
 	i := long levels_load
-	# Stride in by 4x because I haven't changed this to just fixed addresses yet:
-	i += v0
-	i += v0
-	i += v0
-	i += v0
+	# Stride in by 2x because I did fix it
+	i += v2
+	i += v2
 	# Load v4 bytes
-	load v3
+	load v1
 
+	# Address into code:
 	i := load_level_source_address
-	save v3
+	save v1
+
+	i := long enemies_load
+	i += v2
+	i += v2
+	load v1
+
+	# Address into code:
+	i := load_level_enemy_list
+	save v1
+
+	# Reset the enemy indexer:
+	i := last_enemy
+	v0 := 0
+	save v0
 
 	# We reset the 'game grid' data area here
 	# Fill v0 to v6 with -1s:
@@ -1291,8 +1319,9 @@ to-code
 	v9 := 0
 	loop
 		# Self modifying code goes here:
+		0xF0 00 
 		: load_level_source_address
-		i := long level_lr_1
+		0 0
 		i += v9
 
 		# And for some reason, load it into our registers backwards:
@@ -1318,10 +1347,10 @@ to-code
 	# Also draws trash:
 	# draw_obstacles
 
-	# This is only called once, why subroutine it:
+	# This is only called once, so perhaps here is the code, instead of being a sub:
 #: draw_obstacles
 	v0 := 0
-	i := 0x180
+	i := lowmem_register_stash
 	save vF
 
 	plane 2
@@ -1413,8 +1442,17 @@ to-code
 	v4 := 10
 	flash_trash
 
-	i := 0x180
+	i := lowmem_register_stash
 	load vF
+
+	# Note that this will only 'pre create' enemies, it will not draw them
+	# So they will always insta appear at the start of the level, aboo
+	vE := 0
+	loop
+		create_enemy
+		vE += 8
+		if vE != 32 then
+	again
 #;
 
 #;
@@ -1799,6 +1837,10 @@ to-code
 	i := long random_mob_position
 	save v0
 
+	loadflags v3
+	i := long level_select_flagsave
+	if v0 == 0 then v0 := 1
+	save v1
 
 	# I would like to replace these functions and have the data ready to go
 	# Generate quick off_axis table
@@ -2523,7 +2565,7 @@ jump SetupOffPosX
 
 	vE := 0
 	
-	i := 0x180
+	i := lowmem_register_stash
 	save vF
 
 		# Our loop here:
@@ -2692,6 +2734,9 @@ jump SetupOffPosX
 		end
 		#############
 
+		v0 := v1
+		v1 := v2
+		saveflags v1
 
 		######
 		# We flash the screen and nuke all registers to wait for the player to want to progress
@@ -2723,13 +2768,13 @@ jump SetupOffPosX
 
 	: line_abort_point
 	# Then undraw the line:
-	i := 0x180
+	i := lowmem_register_stash
 	# restore how many pixels to draw
 	load v6
 	v7 := 0
 	if v8 != v6 then pull_trigger_internal_loop
 
-	i := 0x180
+	i := lowmem_register_stash
 	load vF
 	plane 1
 
@@ -3008,12 +3053,18 @@ jump SetupOffPosX
 
 	# This will load our enemy into our registers v0 to v7?
 
-	# If there's no mob here, we skip:
-	if mob_type == -1 then jump maybe_create_enemy
+	# If there's no mob here: we maybe create an enemy
+	# We use jump here so that we can 'return' inside maybe_create_enemy
+	# and exit this function
+	# This however is causing me mad problems so:
+	if mob_type == -1 begin
+		maybe_create_enemy
+		if mob_type == -1 then return
+	end
 	# We need to get the display position of this mob:
 : enemy_created
 	# Backup our registers
-	i := 0x180
+	i := lowmem_register_stash
 	save vF
 
 	# Copy our data over to our retaining registers:
@@ -3278,7 +3329,7 @@ jump SetupOffPosX
 	save v3
 
 	# Restore our regular gameplay registers:
-	i := 0x180
+	i := lowmem_register_stash
 	load vF
 ;
 
@@ -3317,24 +3368,50 @@ jump SetupOffPosX
 ;
 
 : last_enemy
- -8
+ 0
 
 : maybe_create_enemy
 	# vF contains the current enemy slot that is empty
 	# I guess I should load an enemy from our hypothetical list of enemies:
 
-	i := last_enemy
-	load v0
+	#i := last_enemy
+	#load v0
+	#v0 += 8
+	#if v0 == 128 then v0 := 0
 
-	v0 += 8
-	if v0 == 128 then v0 := 0
-
+	# Do we create an enemy this frame? Who can say!
 	vF := random 0b00001111
 	if vF != 0 then return
 
-	i := last_enemy
-	save v0
+# Or maybe we definitely create any enemy
+: create_enemy
 
+	# What enemy index are we up to on this level?
+	i := last_enemy
+	load v2 - v2
+
+	# Address the enemy list for this level:
+	0xF0 00
+	: load_level_enemy_list
+	0 0 
+
+	# Loads the first value, the total number of enemies in this level, and steps on I:
+	load v0
+
+	# If we have hit the enemy cap, then stop:
+	if v2 == v0 then return
+
+	# Load the new enemy value:
+	i += v2
+	load v0
+
+	# Step on the index, and save it:
+	v2 += 1
+	i := last_enemy
+	save v2 - v2
+
+	# v0 now contains the enemy type.
+	# need this to be in v2:
 	v2 := v0
 
 	# enemy type is a multiple of 8
@@ -3345,10 +3422,10 @@ jump SetupOffPosX
 	# Note that this should be a multiple of 16 in order to work
 	: retry_get_empty_position
 	i := long random_mob_position
-	load v0
+	load v0 - v0
 	v0 += 2
 	if v0 == 200 then v0 := 0
-	i := long random_mob_position
+	# i := long random_mob_position
 	save v0
 	i += v0
 	load v1
@@ -3377,8 +3454,6 @@ jump SetupOffPosX
 	i += vE
 	save v7
 	# We can now relocate enemy_template v7 to the new memory location
-
-	jump enemy_created
 ;
 
 : remove_enemy
@@ -3755,6 +3830,26 @@ jump SetupOffPosX
 
 		return
 	end
+
+	# Level unlock cheat:
+	if v0 == 1 begin
+		i := long level_select_last
+		load v0 - v3
+		v0 := 0
+		v2 := v1
+		v1 += 1
+		save v0 - v3
+		jump level_select_mode
+	end
+	if v0 == 2 begin
+		i := long level_select_flagsave
+		v0 := 1
+		v1 := 0
+		save v1
+		saveflags v1
+		jump level_select_mode
+	end
+
 	jump level_select_reject_input
 
 : draw_level_select_mainchar
