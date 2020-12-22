@@ -232,6 +232,40 @@ to-data
 0xFE 0x03 0x1D 0x5A 0x6E 0x14 0x14 0x4B 0xFE 0x03 0x38 0xD7 0xFE 0x5F 0x01 0x0A
 0x37 0x14 0x00 0x41 0xFE 0x5F 0x38 0xDC 0xFF 
 
+
+: tutorial_text_1
+0xFE 0x28 0x07 0x23 0x28 0x5F 0xF9 0x19 0xF9 0x5F 0x46 0xFE 0x28 0x2A 0x5A 0x6E
+0x14 0x14 0x4B 0xF9 0x64 0x4B 0xFE 0x31 0x33 0x5F 0x55 0x00 0x5A 0x23 0xFF 
+
+: tutorial_text_2
+0xFE 0x28 0x07 0x64 0x5A 0x14 0xF9 0x6E 0x00 0x5A 0x0F 0xFE 0x2B 0x10 0x46 0x55
+0xF9 0x0F 0x4B 0x00 0x0F 0xFE 0x2D 0x19 0x5F 0x46 0xF9 0x00 0x28 0x3C 0xFE 0x31
+0x22 0x05 0x55 0x46 0x46 0x3C 0xFF 
+
+: tutorial_text_3
+0xFE 0x2B 0x05 0x50 0xF9 0x00 0x41 0x0F 0xF9 0x14 0xFE 0x2E 0x0E 0x55 0x46 0x5F
+0x00 0x5F 0x14 0xFE 0x31 0x2D 0x00 0x69 0x46 0x28 0x0F 0xFE 0x25 0x36 0x19 0x64
+0x55 0x41 0x28 0x5F 0x64 0x55 0x14 0xFF 
+
+: tutorial_text_4
+0xFE 0x31 0x05 0x0A 0x46 0x3C 0x05 0x46 0xFE 0x31 0x0E 0x5A 0x6E 0x14 0x14 0x4B
+0xFE 0x28 0x17 0x0A 0x55 0x28 0x5F 0x5F 0x14 0x55 0x5A 0xFE 0x25 0x20 0x19 0x46
+0x55 0xF9 0xDC 0xF9 0x4B 0x5F 0x5A 0xFF 
+
+: tutorial_text_5
+0xFE 0x2E 0x05 0x14 0x00 0x0A 0x23 0xF9 0xD7 0xFE 0x31 0x2D 0x14 0x00 0x55 0x41
+0x5A 0xFE 0x2E 0x36 0x37 0x14 0x5A 0x5A 0xF9 0xDC 0xFF 
+
+
+: tutorial_text_loopup
+unpack_to_rom tutorial_text_1
+unpack_to_rom tutorial_text_2
+unpack_to_rom tutorial_text_3
+unpack_to_rom tutorial_text_4
+unpack_to_rom tutorial_text_5
+unpack_to_rom tutorial_text_1
+unpack_to_rom tutorial_text_1
+
 ###################
 # Chapter graphics
 
@@ -318,7 +352,7 @@ unpack_to_rom chapter_art_0
 
 # These levels really are already indexed by their level number:
 : levels_saved_scores
-a_level_save  0 4
+a_level_save  0 1
 a_level_save  1 4
 a_level_save  2 4
 a_level_save  3 4
@@ -357,6 +391,11 @@ a_level_save 11 4
 : quick_trash # 7 x 4 items:
 0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	
 0 0 0   0 0 0   0
+
+: trash_xy_data
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+0 0
 
 :monitor quick_trash 28
 
@@ -408,6 +447,31 @@ a_level_save 11 4
 # t_laundry 15
 
 : levels
+: level_garden_1
+tr 0    3 3
+-1
+
+: level_garden_2
+tr 1    3 5
+-1
+
+: level_garden_3
+tr 2    3 3
+ob 0    1 3
+ob 1    5 3
+-1
+
+: level_garden_4
+tr 4    1 5
+-1
+
+: level_garden_5
+tr 0    3 1
+tr 1    3 2
+tr 2    3 3
+tr 4    3 4
+-1
+
 # Living Room 1
 : level_lr_1
 ob 0	1 2
@@ -506,6 +570,31 @@ tr 15	1	5
 #	-1		-1		-1		-1		-1		-1		-1	# 5
 #	-1		-1		-1		-1		-1		-1		-1	# 6
 
+:macro e_Wiggler { :byte { 0 * 8 } }
+:macro e_Chompo { :byte { 1 * 8 } }
+:macro e_Skulkulon { :byte { 2 * 8 } }
+:macro e_Snaker { :byte { 3 * 8 } }
+:macro e_Angero { :byte { 4 * 8 } }
+:macro e_Batato { :byte { 5 * 8 } }
+:macro e_Sneil { :byte { 6 * 8 } }
+:macro e_Limbox { :byte { 7 * 8 } }
+:macro e_Pincing { :byte { 8 * 8 } }
+:macro e_Borkus { :byte { 9 * 8 } }
+:macro e_NeckKing { :byte { 10 * 8 } }
+:macro e_Blurbinger { :byte { 11 * 8 } }
+:macro e_Blade-o { :byte { 12 * 8 } }
+:macro e_Plunge { :byte { 13 * 8 } }
+:macro e_Catbox { :byte { 14 * 8 } }
+:macro e_Skulligmite { :byte { 15 * 8 } }
+
+: level_garden_1_enemy
+	0
+		0
+
+: level_garden_4_enemy
+	1
+		e_Snaker
+
 : level_lr_1_enemy
 	8
 		8 0 0 0
@@ -541,11 +630,14 @@ tr 15	1	5
 		16 48 48 16
 		64 64 
 
-
-
 # These are 2 bytes:
 : levels_load
 # 0
+unpack_to_rom level_garden_1
+unpack_to_rom level_garden_2
+unpack_to_rom level_garden_3
+unpack_to_rom level_garden_4
+unpack_to_rom level_garden_5
 unpack_to_rom level_lr_1
 unpack_to_rom level_lr_2
 unpack_to_rom level_lr_3
@@ -554,6 +646,11 @@ unpack_to_rom level_lr_5
 unpack_to_rom level_lr_6
 
 : enemies_load
+unpack_to_rom level_garden_1_enemy
+unpack_to_rom level_garden_1_enemy
+unpack_to_rom level_garden_1_enemy
+unpack_to_rom level_garden_4_enemy
+unpack_to_rom level_garden_1_enemy
 unpack_to_rom level_lr_1_enemy
 unpack_to_rom level_lr_2_enemy
 unpack_to_rom level_lr_3_enemy
@@ -901,7 +998,9 @@ mpat_8 -1 -1
 # 8
 mpat_8  1 -1
 
-
+# This table contains a cycle of all random enemy positions
+# But I want each level to have a seed, 0 to 99 I guess
+# So that they always play the same on repeat?
 : random_mob_position
 	0
 	2 1	3 4	1 5	1 4
@@ -930,6 +1029,21 @@ mpat_8  1 -1
 	4 2	3 3	5 3	4 4
 	3 1	5 2	2 3	4 3
 
+# A random sequence of seeds:
+: level_seed_values
+	83 21 37 94 26 59 81 60
+	42 3 25 99 13 92 15 27
+	1 23 31 51 56 98 53 80
+	49 35 91 67 46 64 40 84
+	41 2 76 89 5 77 52 17
+	86 74 73 0 97 90 70 4
+	75 36 7 50 24 29 95 78
+	14 82 39 16 87 69 68 6
+	71 63 11 55 66 79 18 62
+	28 30 65 22 9 85 43 34
+	54 61 33 44 45 72 96 38
+	8 48 10 19 32 93 20 47
+	58 88 12 57
 
 : level_select_marker
 0x38 0x44 0x82 0x82 0x82 0x44 0x38 0x00
@@ -977,11 +1091,11 @@ mpat_8  1 -1
 
 : crosshair_reset_data
  0x5b 0x1F 
- 			0x1C 
- 				0 0
+ 			0x80 
+ 				0x1C 0
  0x22 0x1F
- 			0x1D
- 				0 0
+ 			0x80 
+ 				0x1D 0
 
 ##################################
 
@@ -1273,11 +1387,24 @@ to-code
 :macro load_level
 {
 	# level is in... v0?
-	v2 := v0
+	v2 <<= v0
+
+	# Apply this level's seed:
+	i := long level_seed_values
+	load v0
+	v0 <<= v0
+	i := long random_mob_position
+	save v0
+
+	plane 2
+	i := long tutorial_text_loopup
+	i += v2
+	load v1
+	print-string
+	plane 1
 
 	i := long levels_load
 	# Stride in by 2x because I did fix it
-	i += v2
 	i += v2
 	# Load v4 bytes
 	load v1
@@ -1287,7 +1414,6 @@ to-code
 	save v1
 
 	i := long enemies_load
-	i += v2
 	i += v2
 	load v1
 
@@ -1355,8 +1481,8 @@ to-code
 
 	plane 2
 
-	:alias trash_counter v7
-	:alias other_trash_counter v8
+	#:alias trash_counter v7
+	#:alias other_trash_counter v8
 
 	mob_y := 0
 	loop
@@ -1399,10 +1525,15 @@ to-code
 						plane 1
 						calc_mob_draw_xy
 
+						i := long trash_xy_data
+						i += v8 # other_trash_counter
+						i += v8 # other_trash_counter
+						save mob_x - mob_y
+
 						v0 := mob_draw_x
 						v1 := mob_draw_y
 						i := long quick_trash
-						i += trash_counter
+						i += v7 # trash_counter
 
 						# This looks like it's going to save the draw X and draw Y position, as well graphic index
 						save v2
@@ -1413,12 +1544,12 @@ to-code
 
 						sprite mob_draw_x mob_draw_y 8
 
-						v2 := other_trash_counter
+						v2 := v8 # other_trash_counter
 						calc_trash_ui_pos
 						sprite v0 v1 8
 
-						trash_counter += 3
-						other_trash_counter += 1
+						v7 += 3 # trash_counter
+						v8 += 1 # other_trash_counter
 					end
 				end
 
@@ -1447,12 +1578,12 @@ to-code
 
 	# Note that this will only 'pre create' enemies, it will not draw them
 	# So they will always insta appear at the start of the level, aboo
-	vE := 0
-	loop
-		create_enemy
-		vE += 8
-		if vE != 32 then
-	again
+	#vE := 0
+	#loop
+	#	create_enemy
+	#	vE += 8
+	#	if vE != 64 then
+	#again
 #;
 
 #;
@@ -1831,12 +1962,6 @@ to-code
 
 : main
 
-	# First we pick a 'seed'
-	# pick a random start point
-	v0 := random 0b01111110
-	i := long random_mob_position
-	save v0
-
 	loadflags v3
 	i := long level_select_flagsave
 	if v0 == 0 then v0 := 1
@@ -1866,11 +1991,8 @@ to-code
 
 	# Clean out enemy variables:
 	clean_enemy_variables
-
 	# Enter the level select loop:
 	level_select_mode
-
-
 
 	reset_for_new_game_loop
 
@@ -2175,15 +2297,15 @@ to-code
 : crosshair_1_data
  0x5b 0x1F 
  			: crosshair_1_subpixels
- 			0x1C 
+ 			0x80 
  				: crosshair_1_onaxis
- 				0 0
+ 				0x1C 0
 : crosshair_2_data
  0x22 0x1F
  			: crosshair_2_subpixels
- 			0x1D
+ 			0x80
  				: crosshair_2_onaxis
- 				0 0
+ 				0x1D 0
 
 
 # These are determined by our current rotation
@@ -2794,6 +2916,7 @@ jump SetupOffPosX
 
  	v7 := 0
 
+ 	# This trash sweep fails to remove the trash item from the game grid
  	#if v5 == 1 then 
  	plane 2
  	loop
@@ -2813,28 +2936,44 @@ jump SetupOffPosX
 	 	#if v5 != 0 begin
 	 		vE := vF
 			sprite v0 v1 8
+			# If we hit it:
 	 		if vE != 0 begin
 
 	 			v7 += -1
+
+	 			# remove it's sprite:
 				plane 1
 				sprite v0 v1 8
 				
+				i := long trash_xy_data
+				i += v5
+				i += v5
+				load v1
+				# We now have the X Y address
+				address_game_cell
+				v0 := -1
+				save v0
+
 				Tx += Tr
 				if Tr != 0 then Tr += 1
 
 				v2 := v5
 				calc_trash_ui_pos
 
+				# Adjust the marker for having hit it:
 				v0 -= 1
 				v1 -= 1 
 				
+				# Mark it off on the UI:
 				i := long trash_get
 				#sprite v0 v1 0
 				plane 2
 				sprite v0 v1 0
 
+				# Grab some -1s:
 	 			i := long level_reset_data
 	 			load v2
+	 			# -1 out the quick trash:
 	 			i := long quick_trash
 	 			i += v6
 	 			save v2
@@ -3370,6 +3509,9 @@ jump SetupOffPosX
 : last_enemy
  0
 
+: next_enemy_timer
+ 16
+
 : maybe_create_enemy
 	# vF contains the current enemy slot that is empty
 	# I guess I should load an enemy from our hypothetical list of enemies:
@@ -3380,7 +3522,12 @@ jump SetupOffPosX
 	#if v0 == 128 then v0 := 0
 
 	# Do we create an enemy this frame? Who can say!
-	vF := random 0b00001111
+	i := next_enemy_timer
+	load vF - vF
+	vF -= 1
+	if vF == -1 then vF := 16
+	save vF - vF
+
 	if vF != 0 then return
 
 # Or maybe we definitely create any enemy
@@ -4084,3 +4231,5 @@ jump SetupOffPosX
 
 :monitor sweeps_this_level 2
 :monitor level_select_last 4
+
+	:monitor crosshair_1_data 10
