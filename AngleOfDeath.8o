@@ -10,13 +10,13 @@
 
 # What's Missing from Angle of Death
 
-# Title Screen
+# kinda Title Screen
 # Introduction sequence
-# Ingame text
-# Level Select Animations
-# Correct Chapter selection
-# Chapter select score record + display
-# Proper Enemy Selection for the levels
+# done Ingame text
+# done Level Select Animations
+# done Correct Chapter selection
+# done Chapter select score record + display
+# done Proper Enemy Selection for the levels
 # Spirit
 # Spirit Reaping
 # Ending
@@ -352,12 +352,6 @@ unpack_to_rom tutorial_end_text_6
 # 0:
 unpack_to_rom chapter_art_0
 
-
-: sweeps_this_level
-0 
-
-: score_this_level
-0 0 0
 
 : wipey_wipe
 0 0 0 0 0 0 0 0
@@ -970,6 +964,8 @@ enemy_framework 1 3 -1
 	# Goes around in circles
 	64 1 48 1  32 1 16 1 	-1 0 0 0 	0 0 0 0 
 
+
+# First byte is speed modifier of some kind
 : default_mob_datas
 # 0 Wiggler
 	1 0 0 0 0 0 0 0
@@ -1363,9 +1359,9 @@ to-code
 :macro reset_sweeps
 {
 	v0 := 0
-	i := long sweeps_this_level
+	i := sweeps_this_level
 	save v0
-	i := long score_this_level
+	i := score_this_level
 	save v0
 
 	draw_sweeps
@@ -1447,6 +1443,10 @@ to-code
 
 	i := lowmem_real_level_pointer
 	save v2 - v2
+
+	i := reap_mode
+	v0 := 0
+	save v0
 
 	# Apply this level's seed:
 	i := long level_seed_values
@@ -2126,6 +2126,10 @@ to-code
 		
 		v0 := 0xE if v0 key then jump trigger_pull
 
+		v0 := 0xF if v0 key then jump swap_reap
+
+		: reap_return
+
 		v0 := 0xD if v0 key begin
 			v4 := 4
 			flash_trash
@@ -2265,6 +2269,8 @@ to-code
 		## v0 is our current frame cycle value
 
 		service_enemy
+
+
 
 		: trigger_return
 
@@ -2680,6 +2686,67 @@ jump SetupOffPosX
 	# Then we must return, and, we jumped here, so
 ;
 
+: reap_mode
+	0
+
+: swap_reap
+	i := reap_mode
+	load v5 - v5
+	v0 := 1
+	v0 -= v5
+	save v0
+
+	v6 := 0
+
+: swap_reap_2nd_pass
+	plane 1
+	if v5 == 0 then plane 2
+
+	v4 := 0
+	loop
+		i := long quick_trash
+		i += v4
+
+		load v2
+
+		if v2 == -1 then jump skip_reap_rewdraw_trash
+
+		i := long furniture
+	 	i += v2
+	 	sprite v0 v1 8
+
+		: skip_reap_rewdraw_trash
+		v4 += 3
+
+		if v4 != 27 then
+	again
+
+	v4 := 0
+	loop
+		i := long enemy_fast_redraw
+		i += v4
+		load v3
+
+		if v3 == -1 then jump skip_reap_redraw_enemy
+
+		i := long brushable_mobs
+		i += v2
+		sprite v0 v1 8
+
+		: skip_reap_redraw_enemy
+		v4 += 8
+
+		if v4 != 64 then
+	again
+
+	v6 += 1
+	v5 =- v6
+	if v6 == 1 then jump swap_reap_2nd_pass
+
+	plane 1
+
+	jump reap_return
+
 : trigger_pull
 	# We want to strobe a pixel from crosshair_a to crosshair_b
 	# We know the real positions of these crosshairs in crosshair_1_data
@@ -2763,7 +2830,7 @@ jump SetupOffPosX
 	# Track points with this:
 	Tx := 0
 	# Starting points should be the current number of sweeps:
-	i := long sweeps_this_level
+	i := sweeps_this_level
 	# Let's get XO chip finally
 	load Tr - Tr
 	vF := 10
@@ -2792,20 +2859,24 @@ jump SetupOffPosX
 	# Remove them all:
 	#sweep_enemies
 	#sweep_trash
-	
-	# Activate collision detection
-	v5 := 1
-	# Test one at a time (as part of v5 being on)
-	sweep_trash
-	if Tx == 0 then Tr := 0
-	sweep_enemies
+
+	# If we are in reaping mode, we are not sweeping trash or enemies
+	i := reap_mode
+	load v0
+
+	if v0 == 0 begin
+		# Activate collision detection
+		v5 := 1
+		# Test one at a time (as part of v5 being on)
+		sweep_trash
+		if Tx == 0 then Tr := 0
+		sweep_enemies
+	end
 
 
 	plane 1
-
-
 	draw_score
-	i := long score_this_level
+	i := score_this_level
 	load v0 - v0
 	v0 += Tx
 	# Don't need with v0 - v0 leaving I static:
@@ -2829,10 +2900,10 @@ jump SetupOffPosX
 
 		# All registers are available at this time!
 		# We need to reload the score:
-		i := long score_this_level
+		i := score_this_level
 		# Let's load this:
 		load v9 - v9
-		i := long sweeps_this_level
+		i := sweeps_this_level
 		load v8 - v8
 
 		i := long mul_8
@@ -2943,6 +3014,7 @@ jump SetupOffPosX
 		jump game_restart
 	end
 
+	# 
 	v4 := 4
 	flash_trash
 
@@ -3258,7 +3330,7 @@ jump SetupOffPosX
 	# This will load our enemy into our registers v0 to v7?
 
 	# If there's no mob here: we maybe create an enemy
-	# We use jump here so that we can 'return' inside maybe_create_enemy
+	# We used jump here so that we can 'return' inside maybe_create_enemy
 	# and exit this function
 	# This however is causing me mad problems so:
 	if mob_type == -1 begin
@@ -3280,6 +3352,10 @@ jump SetupOffPosX
 	# Now because we save the enemy position we don't need to do this:
 	# calc_mob_draw_xy
 
+	i := reap_mode
+	load vF - vF
+	if vF == 1 then plane 2
+	if vF == 0 then plane 1
 
 	# mob_type is now a 0x8 strided list
 	# load up the sprite spacing for this sprite:
@@ -3531,6 +3607,8 @@ jump SetupOffPosX
 	i := long enemy_fast_redraw
 	i += vE
 	save v3
+
+	plane 1
 
 	# Restore our regular gameplay registers:
 	i := lowmem_register_stash
@@ -4207,14 +4285,14 @@ jump SetupOffPosX
 
 : increase_sweeps
 	
-	i := long sweeps_this_level
+	i := sweeps_this_level
 	load v0
 	v3 := v0
 	draw_sweeps
 	v0 := v3
 	v0 += 1
 	if v0 == 11 then v0 := 10
-	i := long sweeps_this_level
+	i := sweeps_this_level
 	save v0
 
 	# draw_sweeps
@@ -4230,7 +4308,7 @@ jump SetupOffPosX
 : draw_score
 	v1 := 108
 	v2 := 56
-	i := long score_this_level
+	i := score_this_level
 	load v0
 
 : draw_bcd_v1v2
@@ -4269,10 +4347,7 @@ jump SetupOffPosX
 	0
 
 : lowmem_real_level_pointer
- 0
-
-
-
+	0
 
 # Ideally these will live in low memory
 : crosshair_a
@@ -4284,6 +4359,13 @@ jump SetupOffPosX
 0b11100000
 0b11100000
 0b11100000
+
+# Putting these in low memory saves more memory than it costs to put it in high memory:
+: sweeps_this_level
+0 
+: score_this_level
+0
+
 
 :calc FREE { 4096 - HERE }
 : FREE_CODE_BYTES
