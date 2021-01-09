@@ -87,8 +87,6 @@
 :calc player_TOP_LIMIT { UL_Y + 3 }
 :calc player_LOW_LIMIT { LL_Y - 3 }
 
-:const lowmem_register_stash 0x180
-
 :macro do-5		X { X X X X X }
 :macro do-8		X { do-5 X 
 					X X X }
@@ -113,6 +111,13 @@
 					do-44 X
 					do-10 X
 					do-10 X
+				}
+
+:macro do-256 	X {	
+					do-64 X
+					do-64 X
+					do-64 X
+					do-64 X
 				}
 
 
@@ -140,6 +145,8 @@
 :const c_default_sweeper_x 9
 :const c_default_sweeper_y 8
 :const c_default_sweeper_y_shake 7
+
+:calc lowmem_register_stash { 0x200 + 0x08 }
 
 #########
 #
@@ -223,16 +230,76 @@
 
 
 :calc CODE_POS { 0x200  }
-:calc DATA_POS { 0x1000 }
-# I genuintely don't know how these actually work. I know what they do, but
-# Literally, looking at them, I have no clue:
+:calc EX_CODE_POS { 0x0000 }
+:calc DATA_POS { 0x1210 }
+
+:calc macro_memory_copy_read { 0x0 }
+:macro macro_memory_copy {
+	:calc macro_memory_copy_value { @ macro_memory_copy_read }
+	:byte { macro_memory_copy_value }
+	:calc macro_memory_copy_read { macro_memory_copy_read + 1 }
+}
+
+
 :macro to-code { :calc DATA_POS { HERE }  :org { CODE_POS } }
 :macro to-data { :calc CODE_POS { HERE }  :org { DATA_POS } }
+# And an extra code stash:
+:macro to-ex-code { :calc CODE_POS { HERE } :org { EX_CODE_POS } }
+:macro end-ex-code { 
+	:org { CODE_POS }
+}
+
+:macro copy_ex_code {
+	# We need to copy 0x000-0x1FF to 0x1000 to 0x11FF
+	:org 0x1000
+
+	do-256 macro_memory_copy
+	do-256 macro_memory_copy
+}
 
 :macro unpack_to_rom ADDRESS {
 	:byte { 0xFF & ADDRESS >> 8 }
 	:byte { 0xFF & ADDRESS }
 }
+
+
+# This ensures this code resides at 0x200:
+: main
+	# Copy 0x1000 - 0x11FF to
+	#      0x0000 - 0x01FF
+
+	# This gives me 512 extra code bytes, at the cost of 36 bytes
+	# This can be further reduced by continuing to copy an additional 8 bytes
+	# We also set lowmem_register_stash to be 0x200 + 8
+	: mem_copy_loop
+	0xF0 0x00
+	: mem_copy_read
+	0x10 0x00
+
+	load v7
+
+	i := mem_copy_read
+	load v8 - v9
+	v9 += 8
+	if v9 == 0 then v8 += 1
+
+	save v8 - v9
+
+	# Convert to 0xA?
+	v8 += 0x90
+
+	: mem_copy_write
+	0xA0 0x00
+
+	save v7
+
+	i := mem_copy_write
+	save v8 - v9
+
+	if v8 != 0xA2 then jump mem_copy_loop
+	if v9 != 0x08 then jump mem_copy_loop
+
+	jump copy_complete_do_game
 
 ##############################
 # So I have had to impliment to-data, and to-code in order to continue working on this project
@@ -918,6 +985,13 @@ cross_x += off_axis
 #0x79 0x82 0x72 0x0A 0xF1 0xE7 0x08 0x08 0x08 0xE7 0x3C 0xA2 0xBC 0xA4 0x22 0xF8
 #0x80 0xF0 0x80 0xF8
 
+: qtex_sweep
+0x3D 0x41 0x39 0x05 0x78 0x17 0x14 0x57 0x54 0xA7 0xDF 0x10 0x9E 0x10 0xDF 0x78
+0x44 0x78 0x40 0x40 
+: qtex_reap
+0xAF 0xA8 0xAF 0x09 0xA8 0x3E 0xA0 0x3C 0x20 0xBE 0x23 0x52 0x8B 0xFA 0x8A 0xCA 
+0x2A 0xCA 0x00 0x0A
+
 : block_cube
 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 
 
@@ -1280,8 +1354,8 @@ mpat_8  1 -1
  0 0 0 0 0 0 0 0 
 
 
-:monitor register_dump 16
-:monitor game_grid 49
+#:monitor register_dump 16
+#:monitor game_grid 49
 
 ###############################
 #
@@ -2155,8 +2229,7 @@ to-data
 ## The actual start of execution:
 to-code
 
-: main
-
+: copy_complete_do_game
 	loadflags v3
 	v0 := 60
 	v1 := 59
@@ -2457,7 +2530,7 @@ to-code
 
 
 
-	jump main
+#	jump main
 
 : draw_vague_crosshair
 	i := player_crosshair_adjust
@@ -2830,6 +2903,21 @@ jump SetupOffPosX
 	v2 := sweeper_state_sweep_2_reap
 	sweeper_goto_state
 
+	# Set up our screen shake:
+	on_axis := 2
+	off_axis := 4
+	v2 := 8
+	screen_shake
+
+	i := long qtex_sweep
+	v0 := 2
+	v1 := 29
+	qtex
+	i := long qtex_reap
+	v0 := 2
+	v1 := 29
+	qtex
+
 : swap_reap
 	# This doesn't have to be fast
 	# And ideally it should be be memory efficient
@@ -2896,9 +2984,6 @@ jump SetupOffPosX
 	# No matter what we are pulling the trigger here
 
 	# We use up to v8 in this function, which is ok and doesn't affect normal gameplay
-
-	v2 := sweeper_state_sweep1
-	sweeper_goto_state
 
 	v2 := random 0x01
 	if v2 == 0 then	i := address_crosshair_1_data_memory
@@ -2991,6 +3076,14 @@ jump SetupOffPosX
 	v7 := c_trigger_pull_init
 	v8 := 0
 
+	i := reap_mode
+	load v0
+
+	if v0 == 0 then v2 := sweeper_state_sweep1
+	if v0 == 1 then v2 := sweeper_state_reap_spin
+
+	sweeper_goto_state
+
 	pull_trigger_internal_loop
 
 	if v7 != c_trigger_pull_init then jump line_abort_point
@@ -3017,8 +3110,16 @@ jump SetupOffPosX
 		sweep_trash
 		if Tx == 0 then Tr := 0
 		sweep_enemies
+		jump trigger_pull_skip_reap_routines
 	end
 
+	# else (ie, is in reap mode)
+	# We can't have finished the level:
+	v7 := 1
+
+
+
+	: trigger_pull_skip_reap_routines
 
 	plane 1
 	draw_score
@@ -4189,6 +4290,11 @@ to-code
 #;
 }
 
+to-ex-code
+
+# This is the location of my extra secret code that will replace sub 0x200
+
+:calc mem_measure { HERE }
 : level_select_mode
 	# Captures gameplay and allows the player to select a level
 	reset_for_new_game_loop
@@ -4497,6 +4603,10 @@ to-code
 	end
 ;
 
+:calc mem_measure { HERE - mem_measure }
+
+end-ex-code
+
 : draw_level_select_stats_only
 	if chapter_sublevel == 0 then return
 	if chapter_sublevel == 7 then return
@@ -4559,6 +4669,8 @@ to-code
 	v0 := v8
 	draw_bcd_v1v2
 
+	:monitor line_v_2px_max_low_mem 4
+
 	v1 := 110
 	v2 := 23
 
@@ -4585,6 +4697,7 @@ to-code
 	load vB
 ;
 
+
 : increase_sweeps
 	# Mem is at 449 before golf
 	# Can we code golf this?
@@ -4604,11 +4717,15 @@ to-code
 	q_dig
 ;
 
+
+
 : draw_sweeps
 	v1 := 28
 	v2 := 56
 	q_dig
 ;
+
+
 
 : draw_score
 	v1 := 108
@@ -4634,6 +4751,8 @@ to-code
 	v1 += 6
 	q_dig
 ;
+
+
 
 : q_dig
 	i := long mul_5
@@ -5168,9 +5287,9 @@ frame_time_to_frame_total 50
 frame_time_to_frame_total 50
 frame_time_to_frame_total 50
 
-frame_time_to_frame_total 500
+frame_time_to_frame_total 250
 frame_time_to_frame_total 50
-frame_time_to_frame_total 500
+frame_time_to_frame_total 250
 frame_time_to_frame_total 25
 frame_time_to_frame_total 25
 frame_time_to_frame_total 25
@@ -5211,7 +5330,7 @@ frame_time_to_frame_total 50
 cnst_b sweeper_state_idle_sweep
 
 
-:monitor sweeper_reap_to_sweep_frame_total  23
+#:monitor sweeper_reap_to_sweep_frame_total  23
 
 
 : sweeper_static_sweep_frame_total
@@ -5449,7 +5568,7 @@ state_to_anim_address sweeper_sprite_sweep_bad sweeper_sweep_bad_frame_total
 state_to_anim_address sweeper_sprite_win sweeper_sweep_win_frame_total
 
 
-:monitor table_sweeper_state_startaddress 32
+#:monitor table_sweeper_state_startaddress 32
 
 
 :calc mul_32_table_iterator { 0 }
@@ -5624,7 +5743,9 @@ to-code
 
 
 :calc FREE { 4096 - HERE }
-:calc FREE_EX { 0x199 + 4096 - HERE }
+:calc FREE_EX { 512 + 4096 - HERE }
+
+
 
 to-data
 
@@ -5633,9 +5754,14 @@ to-data
 :byte { FREE }
 :monitor FREE_CODE_BYTES "%2i"
 
-: FREE_EX_CODE_BYTES
-:byte { FREE_EX >> 8 }
-:byte { FREE_EX }
-:monitor FREE_EX_CODE_BYTES "%2i"
+: USED_EX_CODE_BYTES
+:byte { mem_measure >> 8 }
+:byte { mem_measure }
+:monitor USED_EX_CODE_BYTES "%2i"
 
 :monitor spirit_detect_data 7
+
+#:monitor 0x1000 64
+#:monitor 0x0000 64
+
+copy_ex_code
