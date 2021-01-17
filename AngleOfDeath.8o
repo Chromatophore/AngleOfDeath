@@ -266,7 +266,6 @@
 
 # This ensures this code resides at 0x200:
 : main
-
 	# Let's assume we have only one banked memory copy for the time being:
 
 	# Copy 0x1000 - 0x11FF to
@@ -308,6 +307,88 @@
 ## Data I didn't get to yet
 
 to-data
+
+
+: garden_spirit_1_xy_list_a
+# 240
+ 60 28 60 28 60 28 60 29 61 29 61 29 61 28 62 28
+ 62 27 62 27 62 26 62 26 61 25 60 25 59 25 59 25
+ 58 26 57 26 57 27 57 28 57 29 57 29 58 30 58 31
+ 59 31 60 31 61 31 61 31 62 30 63 30 63 29 63 28
+ 63 27 63 27 62 26 62 25 61 25 61 25 60 25 59 26
+ 58 26 58 27 57 27 56 28 55 28 54 29 53 29 53 29
+ 52 29 51 29 51 28 50 28 49 27 49 26 48 25 48 24
+ 47 24 47 23 46 22 46 22 45 21 44 21 43 21 43 21
+ 42 22 41 22 41 23 41 24 41 25 41 25 42 26 42 27
+ 43 27 44 27 45 27 45 27 46 26 47 26 47 25 47 24
+ 47 23 47 23 46 22 46 21 45 21 44 21 43 21 43 21
+ 42 22 41 22 41 23 41 24 41 25 41 25 42 26 42 27
+ 43 27 44 27 45 27 46 27 47 27 48 27 50 27 51 27
+ 52 27 53 27 54 28 54 28 55 29 55 30 56 31 56 32
+ 56 33 57 34 57 35 57 36 58 37 58 38 58 38 58 39
+ 59 39 60 39 61 39 61 39 62 38 63 38 63 37 63 36
+ 63 35 63 35 62 34 62 33 61 33 60 33 59 33 59 33
+ 58 34 57 34 57 35 57 36 57 37 57 37 58 38 58 39
+ 59 39 60 39 61 39 61 39 62 38 63 38 63 37 63 36
+ 64 35 64 34 64 33 64 31 65 30 65 29 66 29 66 28
+ 67 28 68 27 69 27 70 26 71 26 72 27 73 27 74 27
+ 75 27 76 27 77 26 77 26 78 26 78 26 79 25 79 24
+ 79 23 79 23 78 22 78 21 77 21 76 21 75 21 75 21
+ 74 22 73 22 73 23 73 24 73 25 73 25 74 26 74 27
+ 75 27 76 27 77 27 77 27 78 26 79 26 79 25 79 24
+ 79 23 79 23 78 22 78 21 77 21 76 21 76 21 75 21
+ 75 22 74 22 74 23 73 24 73 25 72 26 72 26 71 27
+ 71 28 70 28 70 29 69 29 68 29 67 28 66 28 65 27
+ 64 27 64 26 63 26 62 25 61 25 61 25 60 25 59 25
+ 58 26 58 26 58 27 58 28 59 28 59 29 59 29 60 29
+-1
+: garden_spirit_1_xy_list_b
+# 240
+ 60 28 60 28 60 29 61 29 61 29 61 28 61 28 62 28
+ 62 27 62 27 62 26 61 25 61 25 60 25 59 25 58 26
+ 58 26 57 26 57 27 57 28 57 29 58 30 58 30 58 31
+ 59 31 60 31 61 31 62 30 62 30 63 30 63 29 63 28
+ 63 27 62 26 62 26 62 25 61 25 61 25 60 26 59 26
+ 58 26 57 27 57 27 56 28 55 28 54 29 53 29 52 29
+ 52 29 51 28 50 28 50 28 49 27 49 26 48 25 48 24
+ 47 23 47 23 46 22 46 21 45 21 44 21 43 21 42 22
+ 42 22 41 22 41 23 41 24 41 25 42 26 42 26 42 27
+ 43 27 44 27 45 27 46 26 46 26 47 26 47 25 47 24
+ 47 23 46 22 46 22 46 21 45 21 44 21 43 21 42 22
+ 42 22 41 22 41 23 41 24 41 25 42 26 42 26 43 27
+ 43 27 44 27 45 27 47 27 48 27 49 27 50 27 51 27
+ 52 27 53 28 54 28 55 28 55 29 56 30 56 31 56 32
+ 56 33 57 34 57 35 57 36 58 37 58 38 58 39 59 39
+ 59 39 60 39 61 39 62 38 62 38 63 38 63 37 63 36
+ 63 35 62 34 62 34 62 33 61 33 60 33 59 33 58 34
+ 58 34 57 34 57 35 57 36 57 37 58 38 58 38 58 39
+ 59 39 60 39 61 39 62 38 62 38 63 37 63 37 63 36
+ 64 34 64 33 64 32 64 31 65 30 65 29 66 28 66 28
+ 67 27 68 27 69 27 70 26 71 27 72 27 73 27 74 27
+ 75 27 76 26 77 26 78 26 78 26 79 26 79 25 79 24
+ 79 23 78 22 78 22 78 21 77 21 76 21 75 21 74 22
+ 74 22 73 22 73 23 73 24 73 25 74 26 74 26 74 27
+ 75 27 76 27 77 27 78 26 78 26 79 26 79 25 79 24
+ 79 23 78 22 78 22 78 21 77 21 76 21 75 21 75 22
+ 75 22 74 22 74 23 73 24 73 25 72 26 72 27 71 27
+ 71 28 70 29 69 29 69 29 68 28 67 28 66 28 65 27
+ 64 27 63 26 63 26 62 25 61 25 60 25 59 25 59 26
+ 58 26 58 27 58 27 59 28 59 28 59 29 59 29 60 28
+-1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 : title_screen_text
 0xFE 0x11 0x09 0x41 0x1E 0x37 0x14 0xF9 0x46 0x19 0xFE 0x23 0x18 0x14 0x00 0x5F
@@ -541,16 +622,24 @@ a_level_save 11 4
 0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	0 0 0	
 0 0 0   0 0 0   0
 
+: trash_direct_data
+0 0 0 0 0 0 0 0 0
+
 : spirit_detect_data
 0 0 0 
 : spirit_detect_spirit_type
-	  0 0
+	  0 
+	  	: spirit_movement_xy_lists
+	  	0 0 0 0
+
+# Used to figure out the hitbox of the obsticle that must be hit, not the spirit itself:
 : spirit_detect_draw_xy
 0 0
 
+:monitor quick_trash 32
 
-: trash_direct_data
-0 0 0 0 0 0 0 0 0
+
+
 
 
 : level_reset_data
@@ -602,11 +691,15 @@ a_level_save 11 4
 # t_pillow 14
 # t_laundry 15
 
-:macro sp v X Y {
+:const spirit_byte_len 8
+
+:macro sp v X Y addr_1 addr_2 {
 	:byte { X }
 	:byte { Y }
 	:byte { 0xC0 }
-	:byte { v }
+	:byte { v * 8 }
+	unpack_to_rom addr_1
+	unpack_to_rom addr_2
 }
 
 : levels
@@ -644,7 +737,7 @@ tr 0    2 2
 tr 4    5 4
 ob 16   3 3
 # Define a spirit:
-sp 0	3 3
+sp 0	3 3    garden_spirit_1_xy_list_a  garden_spirit_1_xy_list_b
 -1
 
 # Living Room 1
@@ -1268,10 +1361,13 @@ mpat_8  1 -1
 0x07 0xE0 0x1F 0xF8 0x3F 0xFC 0x7C 0x3E 0x70 0x0E 0xF0 0x0F 0xE0 0x07 0xE0 0x07
 0xE0 0x07 0xE0 0x07 0xF0 0x0F 0x70 0x0E 0x7C 0x3E 0x3F 0xFC 0x1F 0xF8 0x07 0xE0
 
+:calc spirit_alt_graphic_offset { HERE }
 : spirits_sad
 0x00 0x38 0x2C 0x3C 0x06 0x0C 0x35 0x04 0x3C 0x7E 0x4E 0x4F 0xFF 0xFE 0x7E 0x76
 0x1C 0x14 0x1C 0x3E 0x3E 0x1C 0x1C 0x0E 0x00 0x7C 0x1E 0x0E 0x3E 0x17 0x1C 0x00
 0x00 0x00 0x00 0x50 0x70 0x58 0x7C 0x3E 0x3C 0x64 0xE6 0xBF 0x83 0xC2 0x06 0x00
+:calc spirit_alt_graphic_offset { HERE - spirit_alt_graphic_offset }
+: spirits_sad_alt
 0x00 0x70 0x5C 0x74 0x0C 0x06 0x35 0x04 0x3C 0x7E 0x4E 0xCE 0xFF 0x7F 0x7E 0x6E
 0x00 0x1C 0x14 0x7F 0x1C 0x1C 0x1E 0x0F 0x00 0x3C 0x5E 0x0E 0x1F 0x36 0x1C 0x00
 0x00 0x00 0x00 0x50 0x70 0x5C 0x7E 0x1F 0x3E 0x27 0x65 0xFD 0xC1 0x53 0x70 0x00
@@ -1296,43 +1392,6 @@ mpat_8  1 -1
 0x03 0xF0 0x03 0xF0 0x03 0xF0 0x03 0xF8 0x03 0xF0 0x03 0xE0 0x01 0x80 0x00 0x00
 
 
-
-
-
-
-: xy_mainpos
- 60 28 60 28 60 28 60 29 60 30 60 31 60 32 61 32
- 61 32 61 31 61 30 61 29 61 28 61 27 61 26 61 25
- 61 24 61 24 61 24 60 25 60 26 60 27 59 28 59 29
- 58 30 57 31 57 31 56 31 56 31 55 30 54 29 54 28
- 53 27 53 26 52 25 52 24 52 23 51 23 51 23 51 24
- 51 25 52 26 52 27 52 28 52 28 52 29 52 29 52 29
- 52 28 52 28 52 27 52 26 52 25 51 24 50 23 50 22
- 49 21 48 21 47 21 47 22 46 23 45 24 44 25 43 26
- 42 27 41 28 40 28 40 27 39 27 39 26 39 25 38 24
- 39 23 39 22 39 22 39 21 40 21 41 21 41 21 42 22
- 43 23 44 24 45 25 46 26 47 27 48 27 48 27 49 27
- 50 27 51 27 51 26 51 25 51 25 52 24 52 24 52 24
- 51 24 51 25 51 25 51 26 50 27 50 28 50 29 50 30
- 49 31 49 32 49 32 49 33 49 33 50 33 50 32 51 32
- 51 32 52 31 53 31 53 32 54 32 55 32 56 33 57 34
- 58 35 59 35 60 36 61 37 61 37 62 37 62 37 62 37
- 63 37 63 37 63 36 63 36 63 36 62 35 62 35 62 35
- 62 35 61 35 61 36 61 36 60 36 60 36 60 37 59 37
- 59 37 59 37 59 37 59 36 59 36 60 36 60 36 60 35
- 60 35 61 35 61 35 62 35 62 34 62 34 63 34 63 33
- 64 33 64 33 65 32 65 32 65 32 66 31 66 31 66 31
- 67 30 67 30 68 30 68 29 69 29 69 29 70 29 70 29
- 71 28 71 28 72 27 73 26 73 26 74 25 75 25 75 25
- 76 24 77 24 77 24 78 24 78 24 78 24 79 25 79 25
- 79 25 79 25 78 26 78 25 78 25 77 25 77 25 76 24
- 76 24 75 23 74 22 74 22 73 22 73 22 72 22 72 23
- 72 23 71 24 71 25 71 25 71 26 72 26 72 27 72 27
- 72 26 73 26 73 25 74 24 74 24 75 23 75 22 76 22
- 76 22 76 23 76 23 76 24 76 25 75 26 75 27 74 28
- 73 28 72 29 71 29 70 29 69 29 68 28 67 27 66 26
- 65 25 64 25 63 24 62 24 61 24 60 25 59 25 59 26
- 59 27 59 27 59 28 59 28 60 28 60 28 60 28 60 28
 
 
 
@@ -1730,6 +1789,8 @@ to-code
 	v0 := 0
 	save v0
 
+	disable_spirit_function
+
 	# We reset the 'game grid' data area here
 	# Fill v0 to v6 with -1s:
 	i := long level_reset_data
@@ -1741,7 +1802,7 @@ to-code
 	loop
 		save v6
 		v9 += 7
-		:calc g_grid_plus_trash { 49 + 4 * 7 }
+		:calc g_grid_plus_trash { ( 7 * 7 ) + ( 5 * 7 ) }
 		if v9 != g_grid_plus_trash then
 	again
 
@@ -1756,7 +1817,7 @@ to-code
 		i += v9
 
 		# load too much data so we can easily read extra params:
-		load v0 - v5
+		load v0 - v7
 
 		# -1 in our data here signifies we've reached the end of the level data:
 		if v0 == -1 then jump load_level_get_enemies
@@ -1764,11 +1825,11 @@ to-code
 		# Also if this is a spirit data then we should uh, do something else?
 		if v2 == 0xC0 begin
 			# We have X Y coords in, uh, somewhere?
-			v9 += 4
+			v9 += spirit_byte_len
 
 			# Save this data so we can check for it later:
 			i := long spirit_detect_data
-			save v0 - v4
+			save v0 - v7
 			load mob_x - mob_y
 			calc_mob_draw_xy
 			i := long spirit_detect_draw_xy
@@ -1796,6 +1857,7 @@ to-code
 	# This is only called once, so perhaps here is the code, instead of being a sub:
 #: draw_obstacles
 	v0 := 0
+	v7 := 0
 	i := lowmem_register_stash
 	save vF
 
@@ -2522,7 +2584,13 @@ to-code
 		i := frame_cycle_count
 		load v0
 
-		if v0 == 0 begin
+		# We bypass this code if v0 doesn't meet this requirement
+		# We modify this code to be == 0 when the spirit is added
+		:next code_spirit_enable_2
+		if v0 == 99 then jump also_do_spirit_service
+		:next code_spirit_enable
+		if v0 == 99 begin
+			: also_do_spirit_service
 			service_spirit
 			i := frame_cycle_count
 			load v0
@@ -3159,9 +3227,9 @@ jump SetupOffPosX
 	#load v0
 	# v9 now contains reap state
 
-
-	plane 2
+	
 	if v9 == 0 begin
+		plane 2
 		# Test one at a time (as part of v5 being on)
 		sweep_trash
 		if Tx == 0 then Tr := 0
@@ -3173,7 +3241,29 @@ jump SetupOffPosX
 	# We can't have finished the level:
 	v7 := 1
 
+	# We need to see if the player's line hits the spirit
+	# We will already know if it's hit something bad because we will have jump to the line_abort_point
 
+	# At this time, the spirit is only on plane 1, because it's black, and we must only hit it.
+	# We can't draw onto the other plane because the spirit can be 'on top of' things
+	# Really the only way to know is to draw our line on plane 1 instead
+	# Or more accurately, plane 3, because it needs to hit background things
+	# Then remove & redraw the spirit to check for the hit.
+
+	# Step 1: undraw the spirit:
+
+
+	spirit_auto_undraw
+
+	# Then draw it again:
+	spirit_auto_undraw
+
+	# what is vF?
+
+	if vF != 0 begin
+		spirit_auto_undraw
+		remove_spirit
+	end
 
 	: trigger_pull_skip_reap_routines
 
@@ -3375,61 +3465,54 @@ jump SetupOffPosX
 	save v1
 ;
 
+: disable_spirit_function
+	i := code_spirit_enable
+	v0 := 99
+	save v0
+
+	i := code_spirit_enable_2
+	save v0
+;
+
+: spirit_auto_undraw
+	i := lomem_spirit_handy
+	load v4
+	if v0 != -1 begin
+		i := long spirits_sad
+		i += v0
+		sprite v1 v2 8
+	end
+;
+
 : add_spirit
-	# We also need to add the spirit to our level:
-	i := long spirit_detect_spirit_type
-	# What spirit should we be adding:
-	load v0
 
-	# All the things in the level are now grey, we can do legit whatever we want with the spirit
-	i := long mul_8	
-	i += v0
-	load v4 - v4
+	i := long spirit_movement_xy_lists
+	load v3
 
+	# Set up the two position addresses
 
-	v7 := 0
-	v3 := 0
+	i := code_spirit_draw_a
+	save v1
 
-	: loopus
+	i := code_spirit_draw_b
+	save v2 - v3
 
-	i := long xy_mainpos
-	i += v3
-	i += v3
-	load v1
+	# Enable the spirit function:
+	i := code_spirit_enable
+	v0 := 0
+	save v0
 
-	vF := 1
-	v7 =- vF
+	i := code_spirit_enable_2
+	v0 := 32
+	save v0
 
-	#if v7 == 0 then v3 += 1
-	v3 += 1
-	#v0 += v8
-	#v1 += v9
+	# The service function will, of course, initially try to undraw the spirit
+	# So we need to hotwire it as such so that it doesn't get undrawn
 
-	i := long spirits_sad
-	i += v4
-
-	vA := 48
-	if v7 == 1 then i += vA
-
-	sprite v0 v1 8
-
-	vE := 0x8
-	delay := vE
-	loop
-		vE := delay
-		if vE != 0 then
-	again
-
-	sprite v0 v1 8
-
-	jump loopus
-
-
-
-	#v2 := 64
-	#v3 := 32
-
-	#sprite v2 v3 8
+	# We also save a -1 here, this tells us it isn't currently drawn:
+	v0 := -1
+	i := long lomem_spirit_handy
+	save v0
 ;
 
 : sweep_trash
@@ -3570,8 +3653,6 @@ jump SetupOffPosX
 		vF := 0xFF
 		v2 ^= vF
 		v2 += 1
-
-		plane 2
 		
 		loop
 			# We can just step on 1 pixel at a time:
@@ -3588,6 +3669,8 @@ jump SetupOffPosX
 			apply_on_axis_main
 
 			i := line_v_2px_max_low_mem
+
+			plane 2
 			sprite cross_x cross_y 1
 
 			# If the collision detector is in anything but init mode,
@@ -3651,11 +3734,18 @@ jump SetupOffPosX
 				jump pull_trigger_internal_regular_bad
 			end
 
+			# if we are reaping, draw a 'copy' of the line on plane 1
+			if v9 != 0 begin
+				plane 1
+				sprite cross_x cross_y 1
+			end
+
 
 			vE += 0b01000000
 			if vE == 0 begin
 				service_sweeper
 				plane 2
+				if v9 != 0 then plane 3
 				q_delay
 			end
 
@@ -3754,10 +3844,74 @@ jump SetupOffPosX
 	jump repeat_clear_loop
 
 : service_spirit
-	
-	# is there a spirit right now?
+	# If we are here, there is a spirit
+	# We load in our spirit step:
 
+	spirit_auto_undraw
+
+	# v4 will be our 'advance our pointer every 2 service calls' counter
+	# v3 will be our pointer for navigating the XY tables
+
+	v4 += 1
+	if v4 == 2 begin
+		v3 += 1
+		v4 := 0
+	end
+
+	# We also need to possibly undraw the spirit
+
+	# Select which thing to do
+	0xF0 0x00
+	: code_spirit_draw_a
+	0 0
+	if v4 != 0 begin
+		0xF0 0x00
+		: code_spirit_draw_b
+		0 0
+	end
+
+	# Step onward:
+	i += v3
+	i += v3
+
+	# Load the x/y pos:
+	load v1 - v2
+
+	if v1 == -1 begin
+		: remove_spirit
+		# The spirit has gone away
+		disable_spirit_function
+		v0 := -1
+
+		i := lomem_spirit_handy
+		save v4
+
+		# Clear out reap state
+		#v2 := sweeper_state_reap_2_sweep
+		#sweeper_goto_state
+
+		return
+	end
+
+	i := long spirit_detect_spirit_type
+	load v0 - v0
+
+	i := long spirits_sad
+	if frame_stepper != 0 begin
+		v0 += spirit_alt_graphic_offset
+	end
+	i += v0
+
+	sprite v1 v2 8
+
+	: service_spirit_clearout_exit
+
+	i := lomem_spirit_handy
+	save v4
 ;
+
+: lomem_spirit_handy
+	0 0 0 0 0
 
 : service_enemy
 	# v0 is the current value of frame cycle
@@ -5963,7 +6117,7 @@ to-data
 :byte { 512 - mem_measure } 
 :monitor FREE_EX_CODE_BYTES "%2i"
 
-:monitor spirit_detect_data 7
+:monitor spirit_detect_data 10
 
 #:monitor 0x1000 64
 #:monitor 0x0000 64
