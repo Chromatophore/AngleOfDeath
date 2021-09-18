@@ -148,6 +148,8 @@
 :const c_default_sweeper_y_shake 7
 
 :calc lowmem_register_stash { 0x200 }
+:calc lowmem_register_stash_r_data { 0x200 + 0xA }
+:calc lowmem_register_stash_f_step { 0x200 + 0x9 }
 
 #########
 #
@@ -454,9 +456,9 @@ to-data
 0x5A 0xFE 0x2E 0x36 0x37 0x14 0x5A 0x5A 0xF9 0xDC 0xFF 	
 
 : tutorial_text_6
-0xFE 0x28 0x05 0x0F 0x14 0x4B 0x00 0x55 0x5F 0x14 0x0F 0xFE 0x2B 0x0E 0x5A 0x4B
-0x28 0x55 0x28 0x5F 0x5A 0xFE 0x2B 0x2D 0x3C 0x64 0x5A 0x5F 0xF9 0x05 0x14 0xFE
-0x2E 0x36 0x55 0x14 0x00 0x4B 0x14 0x0F 0xFF 
+0xFE 0x25 0x05 0x19 0x28 0x41 0x0F 0xF9 0x37 0x46 0x5A 0x5F 0xFE 0x2B 0x0E 0x5A
+0x4B 0x28 0x55 0x28 0x5F 0x5A 0xFE 0x25 0x2D 0x0A 0x64 0x5F 0xF9 0x5F 0x23 0x14
+0x28 0x55 0xFE 0x28 0x36 0x5F 0x14 0x00 0x5F 0x23 0x14 0x55 0x5A 0xFF 
 
 
 : tutorial_end_text_1
@@ -1421,6 +1423,18 @@ mpat_8  1 -1
 0x00 0x00 0x55 0x00 0x7F 0x00 0x3E 0x00 0x08 0x00 0x09 0xF0 0x0B 0xF8 0x0B 0xA8
 0x0B 0xA8 0x09 0xF8 0x0F 0xF0 0x0F 0xE0 0x0F 0xE0 0x0F 0xF0 0x0F 0xF0 0x1F 0xF0
 
+
+: cut_sprite_v
+0x80
+0x80
+
+: cut_sprite_d
+0x80
+0x40
+
+: cut_sprite_h
+0xC0
+0x00
 
 
 : player_sprite_status
@@ -3101,15 +3115,21 @@ jump SetupOffPosX
 	# We use up to v8 in this function, which is ok and doesn't affect normal gameplay
 
 	v2 := random 0x01
+	i := cleave_restore_flip
+	save v2 - v2
 	if v2 == 0 then	i := address_crosshair_1_data_memory
 	if v2 == 1 then i := address_crosshair_2_data_memory
 	load v1
 	i := pull_trigger_internal_loop
 	save v1
+	i := cleave_start
+	save v1
 	if v2 == 0 then	i := apply_on_axis_flipped_memory
 	if v2 == 1 then i := apply_on_axis_main_memory
 	load v1
 	i := pull_trigger_internal_loop_apply_memory
+	save v1
+	i := cleave_apply
 	save v1
 
 	increase_sweeps
@@ -3156,6 +3176,8 @@ jump SetupOffPosX
 
 	vE := 0
 	
+
+	# up to this point we have our rotations etc in tact:
 	i := lowmem_register_stash
 	save vF
 
@@ -3261,6 +3283,10 @@ jump SetupOffPosX
 	# what is vF?
 
 	if vF != 0 begin
+
+		test_cleave
+
+
 		spirit_auto_undraw
 		remove_spirit
 	end
@@ -3463,6 +3489,354 @@ jump SetupOffPosX
 	load v1
 	i := long spirit_detect_draw_xy
 	save v1
+;
+
+
+
+: test_cleave
+
+# So step one is definitely re-ascertain my limits by using my knowledge of my sweep line's octant data, 
+# apply the bounding box, reassess the line to the start of that region for reach iteration, then navigate
+# it pixel by pixel on axis, leaping out off of the axis a sane distance of N, applying the pixel filter back
+# N times back to the line. Then I have to decide if I run to the 'end' and then turn the whole process on it's head...
+# no that's awful... maybe I... do one side of the line and then 'fix' my starting conditions slightly and resume
+# for the 'other' side of the line?? Yeah... I... I think that's the right approach.
+
+	# So, this is going to be incredibly challenging
+	# A lot of the rotation code is already baked
+	# And here's me trying to add in some extra eggs right at the end...
+
+	#                        0 
+	#   -   1100 | 1110   -  
+	#      -     |     -
+	#   1010  -  |  -   0000
+	#  --------- X ----------
+	#   1000  -  |  -   0010
+	#      -     |     -
+	#   -   0110 | 0100   -
+	#                        
+
+	#:alias mob_draw_x vD
+	#:alias mob_draw_y vC
+	#:alias Tr  vB   # Rotation
+	#:alias TrZ vA   # Rotation Zone
+	# v9 : keeps track of our working rotation zone
+	# v8 : I believe currently contains the maximum on axis value before arriving at other crosshair
+	# v7 
+	# v6
+	#:alias subpx_step v5 # This value is still correct
+	#:alias off_axis v4
+	#:alias on_axis v3
+
+	#:alias cross_y v1
+	#:alias cross_x v0
+
+	# Now based on the value of the *actual line that we rendered* we can pick our correct starting limit
+	# for the 'on axis' value
+
+	# Step 1, did we use the normal or flipped version of our current value in TRZ?
+
+	# Recover current value of TrZ and Tr. note that this Tr counts clockwise, and does not reflect the
+	# angle to horizontal or vertical
+
+	:breakpoint b
+
+	# Get framestepper and UNDRAW The crosshairs, so we do not cleave them:
+	i := lowmem_register_stash_f_step
+	load frame_stepper - frame_stepper
+	draw_crosshairs_from_memory
+
+	# Load up the stashed rotation data:
+	i := lowmem_register_stash_r_data
+	load TrZ - Tr
+
+	# Trigger pull will update the value it selected into here:
+	:next cleave_restore_flip
+	v2 := 0
+
+	# Now, bear in mind that if you start at crosshair 1 (not flipped) that you navigate *backwards from it* to get to the target
+	# If you start from crosshair 2, you navigate *forwards* to get to the target
+
+	# Are we working from crosshair 1, or crosshair 2?
+	# == 1 means we work from crosshair 2
+
+	# If we work from crosshair 1, our rotation zone *FROM THE CROSSHAIR* is flipped
+	# If we work from crosshair 2, our rotation zone is the same as the 'players' perception
+	if v2 == 0 begin
+		# For our purposes, TrZ must be 'inverted' to the other side of the circle
+		# To do this we XOR in 0b00001000
+		vF := 0b00001000
+		# Flip our rotation zone to the other side
+		TrZ ^= vF
+	end
+	# else it was not flipped!
+
+	# The lowest two bits do not help us select our correct limit value
+	v9 := 0b11111100
+	v9 &= TrZ
+
+	# v9 now contains 0b0??00, a 4 byte stride that tells us which value to use as our limit
+	# 00 = mob_draw_x + 16
+	# 01 = mob_draw_y + 16
+	# 10 = mob_draw_x - 16
+	# 11 = mob_draw_y - 16
+
+	# We then pit this versus our crosshair's X or Y position, I guess
+	# Remember we have the luxury of knowing that we HAVE hit the spirit
+
+	# We can obtain our starting point here:
+	: cleave_start
+	i := crosshair_2_data	# <-------------------------- this command
+	load v2
+	# This is the 'starting point' of our line
+	# including the subpixels that were achieved when we hit this location
+	# Note that this is the 'drawing' position of a 3x3 sprite, so mathematically:
+	cross_x += 1
+	cross_y += 1
+	# v2 contains the initial subpixel value, that we need to flip:
+	vF := 0xFF
+	v2 ^= vF
+	v2 += 1
+
+	# We now have the 'starting point' of our line
+
+	# v9 also tells us which crosshair value to use as our 'starting' 0 on axis value to compute our 'limit'
+	# 00 => we want to start at on_axis = cross_x - (mob_draw_x + 16)
+	# 01 => we want to start at on_axis = cross_y - (mob_draw_y + 16)
+	# 10 => we want to start at on_axis = (mob_draw_x - 16) - cross_x
+	# 11 => we want to start at on_axis = (mob_draw_y - 16) - cross_y
+
+	# Can we simplify this:
+	# 00 => we want to start at on_axis = cross_x - mob_draw_x - 16
+	# 01 => we want to start at on_axis = cross_y - mob_draw_y - 16
+	# 10 => we want to start at on_axis = mob_draw_x - cross_x - 16
+	# 11 => we want to start at on_axis = mob_draw_y - cross_y - 16
+
+	# How can we achieve this with v9 as it is?
+	# We could assign a value of 0 to our working register, which can be uhm
+	v7 := 0
+	# v7 I guess
+
+	# So, no matter what we do we try to subtract 16 from it, and if we underflow
+	# clamp to maybe 0?
+
+	# I mean, I think so anyway
+
+	# Realistically these will never be less than 0 because the spirit will never straddle the border wall
+
+	to-data
+
+	# In order to do a 4 byte mem copy, we need 4 bytes next to each other...
+	: cleave_register_table
+	v7 -= cross_x
+	v7 += mob_draw_x
+
+	v7 -= cross_y
+	v7 += mob_draw_y
+
+	v7 += cross_x
+	v7 -= mob_draw_x
+
+	v7 += cross_y
+	v7 -= mob_draw_y
+
+	to-code
+
+	i := long cleave_register_table
+	i += v9
+
+	# vC, D E and F can be used until we load the spirit XY
+	load vC - vF
+	i := cleave_calc_starting_on_axis
+	save vC - vF
+
+
+	# We need the X Y coords of the spirit
+	i := lomem_spirit_handy_xy
+	load mob_draw_x - mob_draw_y
+
+	# Move to center of sprite:
+	mob_draw_x += 3
+	mob_draw_y += 3
+
+	: cleave_calc_starting_on_axis
+	v7 += 0
+	v7 += 0
+
+	:const cleave_zone_border 12
+
+	vF := cleave_zone_border
+	v7 -= vF
+	# I think this is the underflow?
+	if vF == 0 then v7 := 0
+
+
+	# This gives us our starting value of on axis for this cleave
+	# We also need to work out the starting off axis value for this cleave
+
+	# We need to add v7 instaces of subpx_step to our crosshair's v2 value to get our starting subpixels
+	# This also has the benefit of allowing us to compute our starting X and Y coordinate
+	
+	# So, starting at our crosshair X and Y coordinate, we want to run cleave apply the current value of 
+	# v7 times
+	# Then we will have our 'starting' true X Y and subpixel coordinates
+
+	loop
+		# We can just step on 1 pixel at a time:
+		on_axis := 1
+		off_axis := 0
+		v2 += subpx_step
+		if vf != 0 then off_axis := 1
+		# Easy 45 degree mode:
+		if subpx_step == 0xFF then off_axis := 1
+		
+		# Apply this:
+		cleave_apply
+
+		#i := line_v_2px_max_low_mem
+		#sprite v0 v1 1
+
+		v7 += -1
+		if v7 != 0 then
+	again
+
+	# cross_x, cross_y, and v2 now reflect our starting cleave location
+
+	i := cleave_start_location
+	save v2
+
+	# Now we can load this memory back for each pass
+
+
+	# We also need to select the correct 'blend' sprite
+
+	# At this time, v9 still contains the high bits of the rotation nibble
+	# We are however about to destroy this data by using it to count the number of pixels remaining
+	# We should likely select our cleave sprite at this time
+
+	:calc cleave_zone_total_length { cleave_zone_border * 2 }
+	:calc cleave_zone_reverse_border { 0 - cleave_zone_border }
+	
+	# Load up the stashed rotation data:
+	# i := lowmem_register_stash_r_data
+	# load TrZ - Tr
+
+	# TrZ is vA and Tr is vB
+
+
+	loop
+		# Start a new loop:
+
+		i := cleave_start_location
+		load v2
+		v7 := cleave_zone_total_length
+
+		# Our math delivers coordinates 1 pixel away from the line
+		# If we do no further adjustments.
+		# This suggests that we want to go one deeper
+
+		# I know we're doing a vertical cleave at this time, which means we must translate our position up by 1, vertically:
+		# This may be wrong:
+		# cross_y -= 1
+
+		loop
+			#:breakpoint q
+			# We can now 'cleave' our sprite
+
+			# To do this, we take our current location, and move cleave_zone_border pixels on the off axis:
+
+			vC := cleave_zone_border
+			vD := -1
+
+			i := cleave_step_location
+			save v1
+
+			: cleave_second_pass
+			v9 := cleave_zone_border
+			on_axis := 0
+			off_axis := vC
+			cleave_apply 
+
+			# Technically we need to make sure we don't run outside of the arena
+			# But we can worry about that later
+
+			# Let's assume we've made a horizontal line and need to use a vertical filter
+
+			# We need to count down
+			off_axis := vD
+
+			# How can we decide what is correct?
+			# We would need to refer to TrZ I believe?
+
+			i := long cut_sprite_v
+			loop
+				# Apply sprite
+				sprite cross_x cross_y 1
+
+				# Debug:
+				vE := vF
+				q_delay
+				vF := vE
+
+				# If we hit something, don't undraw, otherwise, remove it:
+				if vF == 0 then sprite cross_x cross_y 1
+				# If we did hit something then we instead, do not undraw it, moving the pixel in the direction of the
+				# sprite
+
+				# Take another step closer back to the line:
+				cleave_apply
+
+				# Count down back to the line:
+				v9 += -1
+				if v9 != 0 then
+			again
+			# And one more to get back to the line:
+			i := cleave_step_location
+			load v1
+
+			if vC == cleave_zone_reverse_border then jump cleave_second_pass_complete
+
+			vC := cleave_zone_reverse_border
+			vD := 1
+
+			q_delay
+
+			# Just do one side for now:
+			#jump cleave_second_pass_complete
+			jump cleave_second_pass
+
+
+			: cleave_second_pass_complete
+			q_delay
+			# Now we move one step along the line:
+			on_axis := 1
+			v2 += subpx_step
+			off_axis := vF
+			cleave_apply
+
+
+			# We've now moved one pixel along the line, after cleaving one side
+			# How many times do we need to do this?
+
+			v7 += -1
+			if v7 != 0 then
+		again
+
+		vF := 8
+		f_delay
+	again
+
+
+;
+
+: cleave_step_location
+0 0
+
+: cleave_start_location
+0 0 0
+
+: cleave_apply # This gets modified
+	apply_on_axis_main
 ;
 
 : disable_spirit_function
@@ -3911,7 +4285,9 @@ jump SetupOffPosX
 ;
 
 : lomem_spirit_handy
-	0 0 0 0 0
+	0 
+	: lomem_spirit_handy_xy
+		0 0 0 0
 
 : service_enemy
 	# v0 is the current value of frame cycle
