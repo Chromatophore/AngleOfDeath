@@ -1424,6 +1424,35 @@ mpat_8  1 -1
 0x0B 0xA8 0x09 0xF8 0x0F 0xF0 0x0F 0xE0 0x0F 0xE0 0x0F 0xF0 0x0F 0xF0 0x1F 0xF0
 
 
+# These sprites move the mid point pixel in a given direction:
+
+: cut3_sprite_down 
+0x40
+0x40
+0x00
+
+: cut3_sprite_up
+0x00
+0x40
+0x40
+
+: cut3_sprite_right
+0x00
+0xC0
+0x00
+
+: cut3_sprite_left
+0x00
+0x60
+0x00
+
+: cut3_sprite_cleanup
+0x00
+0x40
+0x00
+
+
+
 : cut_sprite_v
 0x80
 0x80
@@ -3286,8 +3315,7 @@ jump SetupOffPosX
 
 		test_cleave
 
-
-		spirit_auto_undraw
+		#spirit_auto_undraw
 		remove_spirit
 	end
 
@@ -3539,8 +3567,6 @@ jump SetupOffPosX
 	# Recover current value of TrZ and Tr. note that this Tr counts clockwise, and does not reflect the
 	# angle to horizontal or vertical
 
-	:breakpoint b
-
 	# Get framestepper and UNDRAW The crosshairs, so we do not cleave them:
 	i := lowmem_register_stash_f_step
 	load frame_stepper - frame_stepper
@@ -3640,12 +3666,41 @@ jump SetupOffPosX
 	v7 += cross_y
 	v7 -= mob_draw_y
 
+	: cleave_address_table
+	# 00
+	:pointer cut3_sprite_down
+	:pointer cut3_sprite_up
+
+	# 01
+	:pointer cut3_sprite_left
+	:pointer cut3_sprite_right
+
+	:pointer cut3_sprite_up
+	:pointer cut3_sprite_down
+
+	:pointer cut3_sprite_right
+	:pointer cut3_sprite_left
+
 	to-code
+
+	# vC, D E and F can be used until we load the spirit XY
+
+	# Set up the cleaving sprites:
+	i := long cleave_address_table
+	i += v9
+
+	load vC - vF
+	i := cleave_mainside_sprite
+	save vC - vD
+	i := cleave_offside_sprite
+	save vE - vF
+
+
+	# Set up the register table:
 
 	i := long cleave_register_table
 	i += v9
-
-	# vC, D E and F can be used until we load the spirit XY
+	
 	load vC - vF
 	i := cleave_calc_starting_on_axis
 	save vC - vF
@@ -3702,6 +3757,10 @@ jump SetupOffPosX
 
 	# cross_x, cross_y, and v2 now reflect our starting cleave location
 
+	# Because we are using 3x3 spritse, we offset both of these by 1:
+	cross_x += -1
+	cross_y += -1
+
 	i := cleave_start_location
 	save v2
 
@@ -3723,63 +3782,101 @@ jump SetupOffPosX
 
 	# TrZ is vA and Tr is vB
 
-
+	vE := 4
+	# This is the loop start for the entire cleave procedure
 	loop
 		# Start a new loop:
 
+		# This restores Cross X and Cross Y etc
 		i := cleave_start_location
 		load v2
+
+		# This is our loop variable for going the stretch across the sprite
+		# we'll be taking this many steps across our line from our saved starting point
 		v7 := cleave_zone_total_length
 
-		# Our math delivers coordinates 1 pixel away from the line
-		# If we do no further adjustments.
-		# This suggests that we want to go one deeper
-
-		# I know we're doing a vertical cleave at this time, which means we must translate our position up by 1, vertically:
-		# This may be wrong:
-		# cross_y -= 1
-
+		# This is the loop start for a whole single cleave pass across the whole playfield.
 		loop
-			#:breakpoint q
-			# We can now 'cleave' our sprite
 
-			# To do this, we take our current location, and move cleave_zone_border pixels on the off axis:
 
-			vC := cleave_zone_border
-			vD := -1
+			# The contents of this loop are performed twice.
+			# The first time is the 'main side'
+			# The second time is the 'off side'
+			# These can be either side, depending on the value of TrZ, but, we can use our precomputed sprite
+			# addresses to know which cut sprite to use
+			# This should allow for diagonal cuts, too. Maybe?
 
+			# Step one is to set our selves up for the MAIN side and the FIRST DRAW
+
+			# The first draw is always at the 'extreme' of the cut zone, where we want to REMOVE the pixel,
+			# rather that cleave it
+			# We can unroll the first tick of the loop to allow for this, as the faster this code is
+			# the better
+
+			# So, we actually want to use a different sprite, just a single pixel
+			# This sprite exists as cut3_sprite_cleanup
+			# The main issue is that we flip between main side and offside, as this is mathetically simpler
+			# Than traversing the subpixel line twice
+			# This means that we want to defer to one sprite the first time, and one sprite the 2nd time
+
+			# First Pass setup:
+			# As we'll need it for Pass 2, we save our current 'step' location:
 			i := cleave_step_location
 			save v1
 
-			: cleave_second_pass
+			# As we're about to set them, we can use vC and vD to do our memory ops:
+			i := cleave_mainside_sprite
+			if vE == 0x1 then i := cleave_final_sprite
+			load vC - vD
+			i := cleave_loop_sprite_select
+			save vC - vD
+
+			# We take our current location, and move cleave_zone_border pixels on the off axis:
+			vC := cleave_zone_border
+			# And determine that our direction is '-1'
+			vD := -1
+
+			# That concludes the set up. The 2nd pass will re-enter here:
+
+			: cleave_second_pass_entry
+
+			# We select our cleanup sprite:
+			i := long cut3_sprite_cleanup
+
 			v9 := cleave_zone_border
 			on_axis := 0
-			off_axis := vC
+			off_axis := vC 
+			# Step OUT by vC. We set this up to be the zone border value
 			cleave_apply 
 
-			# Technically we need to make sure we don't run outside of the arena
-			# But we can worry about that later
-
-			# Let's assume we've made a horizontal line and need to use a vertical filter
-
-			# We need to count down
+			# And now we know we'll need to count down in the future
 			off_axis := vD
 
-			# How can we decide what is correct?
-			# We would need to refer to TrZ I believe?
+			# Perform unrolled first stage of loop:
+			# Only undraw the sprite if no collision occurs:
+			sprite cross_x cross_y 3
+			if vF == 0 then sprite cross_x cross_y 3
 
-			i := long cut_sprite_v
+			# Now we can go in by 1:
+			cleave_apply
+
+			# Select the correct sprite for the actual loop:
+			0xF0 0x00
+			: cleave_loop_sprite_select
+			0x00 0x00
+			
 			loop
+
 				# Apply sprite
-				sprite cross_x cross_y 1
+				sprite cross_x cross_y 3
 
 				# Debug:
-				vE := vF
-				q_delay
-				vF := vE
+				# vE := vF
+				# q_delay
+				# vF := vE
 
 				# If we hit something, don't undraw, otherwise, remove it:
-				if vF == 0 then sprite cross_x cross_y 1
+				if vF == 0 then sprite cross_x cross_y 3
 				# If we did hit something then we instead, do not undraw it, moving the pixel in the direction of the
 				# sprite
 
@@ -3788,25 +3885,45 @@ jump SetupOffPosX
 
 				# Count down back to the line:
 				v9 += -1
-				if v9 != 0 then
+				# We count down to 1, rather than 0, as we unrolled the first pass to save like 2 bytes of memory
+				if v9 != 1 then
 			again
-			# And one more to get back to the line:
+
+			# 2nd pass setup (and final restoration)
+			# Restore the line position:
 			i := cleave_step_location
 			load v1
 
+			# If we completed our 2nd pass to get here, we're done:
 			if vC == cleave_zone_reverse_border then jump cleave_second_pass_complete
+
+			# Once again, as we're about to set them, we can use vC and vD to do our memory ops:
+			i := cleave_offside_sprite
+			if vE == 0x1 then i := cleave_final_sprite
+			load vC - vD
+			i := cleave_loop_sprite_select
+			save vC - vD
 
 			vC := cleave_zone_reverse_border
 			vD := 1
 
-			q_delay
+			jump cleave_second_pass_entry
 
-			# Just do one side for now:
-			#jump cleave_second_pass_complete
-			jump cleave_second_pass
+			# Self mod code dump zone:
+			: cleave_mainside_sprite
+			0x00 0x00
+
+			: cleave_offside_sprite
+			0x00 0x00
+
+			: cleave_final_sprite
+			:pointer cut3_sprite_cleanup
 
 
 			: cleave_second_pass_complete
+
+			# Animate our boy:
+			service_sweeper
 			q_delay
 			# Now we move one step along the line:
 			on_axis := 1
@@ -3814,16 +3931,20 @@ jump SetupOffPosX
 			off_axis := vF
 			cleave_apply
 
-
-			# We've now moved one pixel along the line, after cleaving one side
+			# We've now moved one pixel along the line, cleaving both side
 			# How many times do we need to do this?
 
 			v7 += -1
 			if v7 != 0 then
 		again
 
-		vF := 8
-		f_delay
+		vF := 2
+		f_delay_with_sweeper
+		# How many times should we spread the sprite?
+		# Maybe just like, 4
+		vE += -1
+
+		if vE != 0 then
 	again
 
 
