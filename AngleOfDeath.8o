@@ -151,6 +151,12 @@
 :calc lowmem_register_stash_r_data { 0x200 + 0xA }
 :calc lowmem_register_stash_f_step { 0x200 + 0x9 }
 
+# i := long NNNN
+:macro i_next_next LABEL DEFVAL {
+    0xF0 0x00 : LABEL 
+    :pointer DEFVAL 
+}
+
 #########
 #
 # The big redo
@@ -260,10 +266,12 @@
 	do-256 macro_memory_copy
 }
 
-:macro unpack_to_rom ADDRESS {
-	:byte { 0xFF & ADDRESS >> 8 }
-	:byte { 0xFF & ADDRESS }
-}
+
+# Depreciated! Hooray for :pointer !
+#:macro unpack_to_rom ADDRESS {
+#	:byte { 0xFF & ADDRESS >> 8 }
+#	:byte { 0xFF & ADDRESS }
+#}
 
 
 # This ensures this code resides at 0x200:
@@ -280,10 +288,8 @@
 	# vA will already be 0:
 	# vA := 0
 	: mem_copy_loop
-	0xF0 0x00
-	: mem_copy_read
-	0x10 0x00
 
+	i_next_next mem_copy_read 0x1000
 	i += vA
 	i += vA
 	load v7
@@ -453,12 +459,13 @@ to-data
 
 : tutorial_text_5
 0xFE 0x2E 0x05 0x14 0x00 0x0A 0x23 0xF9 0xD7 0xFE 0x31 0x2D 0x14 0x00 0x55 0x41
-0x5A 0xFE 0x2E 0x36 0x37 0x14 0x5A 0x5A 0xF9 0xDC 0xFF 	
+0x5A 0xFE 0x2C 0x36 0x19 0x14 0x6E 0x14 0x55 0xF9 0xDC 0xFF 
 
 : tutorial_text_6
+0xFF
 0xFE 0x25 0x05 0x19 0x28 0x41 0x0F 0xF9 0x37 0x46 0x5A 0x5F 0xFE 0x2B 0x0E 0x5A
-0x4B 0x28 0x55 0x28 0x5F 0x5A 0xFE 0x25 0x2D 0x0A 0x64 0x5F 0xF9 0x5F 0x23 0x14
-0x28 0x55 0xFE 0x28 0x36 0x5F 0x14 0x00 0x5F 0x23 0x14 0x55 0x5A 0xFF 
+0x4B 0x28 0x55 0x28 0x5F 0x5A 0xFE 0x25 0x2D 0x5F 0x23 0x14 0x78 0xF9 0x23 0x28
+0x0F 0x14 0xFE 0x25 0x36 0x28 0x41 0xF9 0x5F 0x23 0x28 0x41 0x1E 0x5A 0xFF 
 
 
 : tutorial_end_text_1
@@ -474,9 +481,12 @@ to-data
 #0xFE 0x25 0x07 0x37 0x28 0x41 0x14 0xF9 0x55 0x64 0x41 0x5A 0xFE 0x25 0x10 0x19
 #0x55 0x46 0x3C 0xF9 0x14 0x0F 0x1E 0x14 0xFE 0x2B 0x19 0x5F 0x46 0xF9 0x14 0x0F
 #0x1E 0x14 0xFF 
-0xFE 0x25 0x07 0x23 0x28 0x1E 0x23 0x37 0x28 0x1E 0x23 0x5F 0xFE 0x28 0x10 0x5F
-0x55 0x00 0x5A 0x23 0xF9 0x05 0x78 0xFE 0x25 0x19 0x4B 0x64 0x5A 0x23 0x28 0x41
-0x1E 0xF9 0x55 0xFE 0x40 0x1F 0xFF 
+#0xFE 0x25 0x07 0x23 0x28 0x1E 0x23 0x37 0x28 0x1E 0x23 0x5F 0xFE 0x28 0x10 0x5F
+#0x55 0x00 0x5A 0x23 0xF9 0x05 0x78 0xFE 0x25 0x19 0x4B 0x64 0x5A 0x23 0x28 0x41
+#0x1E 0xF9 0x55 0xFE 0x40 0x1F 0xFF 
+0xFE 0x2B 0x07 0x3C 0x00 0x55 0x32 0x14 0x55 0x5A 0xFE 0x25 0x10 0x46 0x41 0xF9
+0x05 0x46 0x55 0x0F 0x14 0x55 0xFE 0x28 0x19 0x23 0x14 0x37 0x4B 0xF9 0x78 0x46
+0x64 0xFE 0x2D 0x22 0x5F 0x46 0xF9 0x00 0x28 0x3C 0xFF 
 
 : tutorial_end_text_3
 0xFE 0x28 0x05 0x00 0x37 0x37 0xF9 0x1E 0x55 0x14 0x78 0xFE 0x2E 0x0E 0x5F 0x23
@@ -484,10 +494,10 @@ to-data
 0x23 0x14 0xF9 0x37 0x28 0x41 0x14 0xFF 
 
 : tutorial_end_text_4
-0xFE 0x28 0x05 0x0A 0x55 0x28 0x5F 0x5F 0x14 0x55 0x5A 0xFE 0x2B 0x0E 0x1E 0x14
-0x5F 0xF9 0x4B 0x64 0x5F 0xFE 0x28 0x17 0x46 0x64 0x5F 0x5A 0x28 0x0F 0x14 0xB9
-0xFE 0x28 0x20 0x5F 0x23 0x14 0x78 0xF9 0x00 0x55 0x14 0xFE 0x31 0x29 0x19 0x28
-0x41 0x14 0xB9 0xFF 
+0xFE 0x28 0x05 0x0A 0x55 0x28 0x5F 0x5F 0x14 0x55 0x5A 0xFE 0x28 0x0E 0x00 0x55
+0x14 0xF9 0x41 0x46 0xF9 0xDC 0xFE 0x28 0x17 0x00 0x37 0x46 0x41 0x14 0xF9 0x5A
+0x46 0xFE 0x25 0x20 0x5A 0x6E 0x14 0x14 0x4B 0xF9 0x5F 0x23 0x14 0xFE 0x31 0x29
+0x5F 0x55 0x00 0x5A 0x23 0xB9 0xFF 
 
 : tutorial_end_text_5
 0xFE 0x2B 0x05 0xDC 0xF9 0x0F 0x46 0x41 0xC8 0x5F 0xFE 0x2E 0x2D 0x55 0x14 0x00
@@ -499,20 +509,20 @@ to-data
 0x36 0x00 0x37 0x37 0x46 0x6E 0x14 0x0F 0xFF 
 
 : tutorial_text_loopup
-unpack_to_rom tutorial_text_1
-unpack_to_rom tutorial_text_2
-unpack_to_rom tutorial_text_3
-unpack_to_rom tutorial_text_4
-unpack_to_rom tutorial_text_5
-unpack_to_rom tutorial_text_6
+:pointer tutorial_text_1
+:pointer tutorial_text_2
+:pointer tutorial_text_3
+:pointer tutorial_text_4
+:pointer tutorial_text_5
+:pointer tutorial_text_6
 
 : tutorial_endtext_loopup	
-unpack_to_rom tutorial_end_text_1
-unpack_to_rom tutorial_end_text_2
-unpack_to_rom tutorial_end_text_3
-unpack_to_rom tutorial_end_text_4
-unpack_to_rom tutorial_end_text_5
-unpack_to_rom tutorial_end_text_6
+:pointer tutorial_end_text_1
+:pointer tutorial_end_text_2
+:pointer tutorial_end_text_3
+:pointer tutorial_end_text_4
+:pointer tutorial_end_text_5
+:pointer tutorial_end_text_6
 
 ###################
 # Chapter graphics
@@ -549,7 +559,7 @@ unpack_to_rom tutorial_end_text_6
 
 : chapter_art_addresses
 # 0:
-unpack_to_rom chapter_art_0
+:pointer chapter_art_0
 
 
 : wipey_wipe
@@ -700,8 +710,8 @@ a_level_save 11 4
 	:byte { Y }
 	:byte { 0xC0 }
 	:byte { v * 8 }
-	unpack_to_rom addr_1
-	unpack_to_rom addr_2
+	:pointer addr_1
+	:pointer addr_2
 }
 
 : levels
@@ -902,32 +912,32 @@ tr 15	1	5
 # These are 2 bytes:
 : levels_load
 # 0
-unpack_to_rom level_garden_1
-unpack_to_rom level_garden_2
-unpack_to_rom level_garden_3
-unpack_to_rom level_garden_4
-unpack_to_rom level_garden_5
-unpack_to_rom level_garden_6
-unpack_to_rom level_lr_1
-unpack_to_rom level_lr_2
-unpack_to_rom level_lr_3
-unpack_to_rom level_lr_4
-unpack_to_rom level_lr_5
-unpack_to_rom level_lr_6
+:pointer level_garden_1
+:pointer level_garden_2
+:pointer level_garden_3
+:pointer level_garden_4
+:pointer level_garden_5
+:pointer level_garden_6
+:pointer level_lr_1
+:pointer level_lr_2
+:pointer level_lr_3
+:pointer level_lr_4
+:pointer level_lr_5
+:pointer level_lr_6
 
 : enemies_load
-unpack_to_rom level_garden_1_enemy
-unpack_to_rom level_garden_1_enemy
-unpack_to_rom level_garden_1_enemy
-unpack_to_rom level_garden_4_enemy
-unpack_to_rom level_garden_1_enemy
-unpack_to_rom level_garden_1_enemy
-unpack_to_rom level_lr_1_enemy
-unpack_to_rom level_lr_2_enemy
-unpack_to_rom level_lr_3_enemy
-unpack_to_rom level_lr_4_enemy
-unpack_to_rom level_lr_5_enemy
-unpack_to_rom level_lr_6_enemy
+:pointer level_garden_1_enemy
+:pointer level_garden_1_enemy
+:pointer level_garden_1_enemy
+:pointer level_garden_4_enemy
+:pointer level_garden_1_enemy
+:pointer level_garden_1_enemy
+:pointer level_lr_1_enemy
+:pointer level_lr_2_enemy
+:pointer level_lr_3_enemy
+:pointer level_lr_4_enemy
+:pointer level_lr_5_enemy
+:pointer level_lr_6_enemy
 
 
 # Let's decide that a level is defined in memory entirely as a grid
@@ -1532,9 +1542,7 @@ to-code
 	i := data_sprite_draw_code
 	save v1
 
-	0xF0 0x00
-	: data_sprite_draw_code
-	0x00 0x00
+	i_next_next data_sprite_draw_code 0x0000
 	sprite v2 v3 0
 ;
 
@@ -1684,7 +1692,7 @@ to-code
 		# you could instead use :unpack to
 		# produce an indirect pointer-
 		# see the Octo manual for detals:
-		0xF0 0x00 : print-string-read 0x00 0x00
+		i_next_next print-string-read 0x0000
 		i += string-offset
 		load v2
 		while v0 != STR_END
@@ -1854,9 +1862,7 @@ to-code
 	: load_level_manual_reloop
 	loop
 		# Self modifying code goes here:
-		0xF0 00 
-		: load_level_source_address
-		0 0
+		i_next_next load_level_source_address 0x0000
 		i += v9
 
 		# load too much data so we can easily read extra params:
@@ -2381,9 +2387,6 @@ to-code
 	save v1
 
 	# I would like to replace these functions and have the data ready to go
-	# Generate quick off_axis table
-	#generate_tan_table
-	#generate_offaxis_max_table
 
 	clear
 
@@ -2938,9 +2941,7 @@ jump SetupOffPosX
 		# Maybe it's best just to get our subpixels again when we need them?
 
 		WIP_off := off_axis
-		0xF0 00
-		: off_axis_table_address
-		0 0
+		i_next_next off_axis_table_address 0x0000
 
 		i += off_axis
 		load v0
@@ -2958,9 +2959,7 @@ jump SetupOffPosX
 
 
 : set_i_to_offaxis
-	0xF0 00
-	: mem_generic_off_axis
-	0 0
+	i_next_next mem_generic_off_axis 0x000
 ;
 
 
@@ -3313,9 +3312,11 @@ jump SetupOffPosX
 
 	if vF != 0 begin
 
-		test_cleave
+		full_cleave
 
+		# We erase the spirit as part of full cleave:
 		#spirit_auto_undraw
+		# We need to erase the data tho:
 		remove_spirit
 	end
 
@@ -3521,7 +3522,7 @@ jump SetupOffPosX
 
 
 
-: test_cleave
+: full_cleave
 
 # So step one is definitely re-ascertain my limits by using my knowledge of my sweep line's octant data, 
 # apply the bounding box, reassess the line to the start of that region for reach iteration, then navigate
@@ -3672,14 +3673,16 @@ jump SetupOffPosX
 	:pointer cut3_sprite_up
 
 	# 01
-	:pointer cut3_sprite_left
 	:pointer cut3_sprite_right
+	:pointer cut3_sprite_left
 
+	# 10
 	:pointer cut3_sprite_up
 	:pointer cut3_sprite_down
 
-	:pointer cut3_sprite_right
+	# 11
 	:pointer cut3_sprite_left
+	:pointer cut3_sprite_right
 
 	to-code
 
@@ -3688,6 +3691,8 @@ jump SetupOffPosX
 	# Set up the cleaving sprites:
 	i := long cleave_address_table
 	i += v9
+
+
 
 	load vC - vF
 	i := cleave_mainside_sprite
@@ -3861,9 +3866,7 @@ jump SetupOffPosX
 			cleave_apply
 
 			# Select the correct sprite for the actual loop:
-			0xF0 0x00
-			: cleave_loop_sprite_select
-			0x00 0x00
+			i_next_next cleave_loop_sprite_select 0x0000
 			
 			loop
 
@@ -3871,9 +3874,10 @@ jump SetupOffPosX
 				sprite cross_x cross_y 3
 
 				# Debug:
-				# vE := vF
-				# q_delay
-				# vF := vE
+				#vB := vF
+				#vF := 2
+				#f_delay
+				#vF := vB
 
 				# If we hit something, don't undraw, otherwise, remove it:
 				if vF == 0 then sprite cross_x cross_y 3
@@ -3898,6 +3902,7 @@ jump SetupOffPosX
 			if vC == cleave_zone_reverse_border then jump cleave_second_pass_complete
 
 			# Once again, as we're about to set them, we can use vC and vD to do our memory ops:
+
 			i := cleave_offside_sprite
 			if vE == 0x1 then i := cleave_final_sprite
 			load vC - vD
@@ -4356,13 +4361,9 @@ jump SetupOffPosX
 	# We also need to possibly undraw the spirit
 
 	# Select which thing to do
-	0xF0 0x00
-	: code_spirit_draw_a
-	0 0
+	i_next_next code_spirit_draw_a 0x0000
 	if v4 != 0 begin
-		0xF0 0x00
-		: code_spirit_draw_b
-		0 0
+		i_next_next code_spirit_draw_b 0x0000
 	end
 
 	# Step onward:
@@ -4377,6 +4378,8 @@ jump SetupOffPosX
 		# The spirit has gone away
 		disable_spirit_function
 		v0 := -1
+
+		v4 := 0
 
 		i := lomem_spirit_handy
 		save v4
@@ -4818,9 +4821,7 @@ to-code
 	load v2 - v2
 
 	# Address the enemy list for this level:
-	0xF0 00
-	: load_level_enemy_list
-	0 0 
+	i_next_next load_level_enemy_list 0x0000
 
 	# Loads the first value, the total number of enemies in this level, and steps on I:
 	load v0
@@ -5026,9 +5027,7 @@ to-code
 	save v1
 
 	# point at sprite start:
-	0xF0 0
-	: draw_chapter_art_sprite_start
-			0 0
+	i_next_next draw_chapter_art_sprite_start 0x0000
 
 	# Sprite is 7x3 8x14 sprites
 	# Start is 36 18
@@ -6035,8 +6034,8 @@ to-data
 
 # Space these by 8:
 :macro state_to_anim_address ADATA FDATA { 
-	unpack_to_rom ADATA
-	unpack_to_rom FDATA
+	:pointer ADATA
+	:pointer FDATA
 	:byte { 0 }
 	:byte { 0 }
 	:byte { 0 }
@@ -6423,7 +6422,7 @@ state_to_anim_address sweeper_sprite_reap_bad sweeper_reap_bad_frame_total
 
 :calc mul_32_table_iterator { 0 }
 :macro mul_32_table_entry { 
-	unpack_to_rom mul_32_table_iterator
+	:pointer mul_32_table_iterator
 	:calc mul_32_table_iterator { mul_32_table_iterator + 32 }
 }
 
@@ -6484,9 +6483,10 @@ to-code
 
 	v1 := 0
 
-	0xF0 00
-	: address_sweeper_framecount_table
-	unpack_to_rom sweeper_sweep_static_to_reap_frame_total
+	i_next_next address_sweeper_framecount_table 0x0000
+	#0xF0 00
+	#: address_sweeper_framecount_table
+	#:pointer sweeper_sweep_static_to_reap_frame_total
 
 	# if asys_cframe is 0 at this time, we have never drawn this sprite
 	v9 := asys_cframe
@@ -6566,9 +6566,7 @@ to-code
 	save vA - vB
 
 : undraw_sweeper_from_last
-	0xF0 00
-	: address_sweeper_sprite
-	unpack_to_rom sweeper_sprite_static_sweep
+	i_next_next address_sweeper_sprite sweeper_sprite_static_sweep
 
 	sprite vC vD 0
 ;
