@@ -157,6 +157,40 @@
     :pointer DEFVAL 
 }
 
+# Copy Reference Bank Switching Code:
+# This code works by assembling in place, at address 0+, then copying to high memory
+# Then we overwrite the sub 0x200 (we are permitted to rewrite this area while assembling)
+# This is close to how I'm already bank swapping the level select in my previous method
+
+:macro bank_init LABEL {
+	: LABEL
+	:calc bank_dst { HERE }
+	:org 0
+}
+:stringmode copy "A" { :byte { @ HERE - bank_dst } }
+:stringmode copy "B" { copy "AAAAAAAAAAAAAAAA" }
+:macro bank_end {
+	:org bank_dst
+	copy "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+}
+
+# bank_load is positioned later:
+
+:macro bank_switch BANK {
+	i := bank_stash
+	save vF
+	:unpack long BANK
+	bank_load
+}
+
+
+
+
+
+
+
+
+
 #########
 #
 # The big redo
@@ -252,31 +286,13 @@
 
 :macro to-code { :calc DATA_POS { HERE }  :org { CODE_POS } }
 :macro to-data { :calc CODE_POS { HERE }  :org { DATA_POS } }
-# And an extra code stash:
-:macro to-ex-code { :calc CODE_POS { HERE } :org { EX_CODE_POS } }
-:macro end-ex-code { 
-	:org { CODE_POS }
-}
-
-:macro copy_ex_code {
-	# We need to copy 0x000-0x1FF to 0x1000 to 0x11FF
-	:org 0x1000
-
-	do-256 macro_memory_copy
-	do-256 macro_memory_copy
-}
-
-
-# Depreciated! Hooray for :pointer !
-#:macro unpack_to_rom ADDRESS {
-#	:byte { 0xFF & ADDRESS >> 8 }
-#	:byte { 0xFF & ADDRESS }
-#}
-
 
 # This ensures this code resides at 0x200:
 : main
-	# Let's assume we have only one banked memory copy for the time being:
+	
+	# We now no longer use my 'single bank copy' strategy and need to use several banks of saved memory.
+
+	# We will simply not try to be a clever clogs on load and will instead just behave ourselves.
 
 	# Copy 0x1000 - 0x11FF to
 	#      0x0000 - 0x01FF
@@ -287,23 +303,51 @@
 
 	# vA will already be 0:
 	# vA := 0
-	: mem_copy_loop
+#	: mem_copy_loop
 
-	i_next_next mem_copy_read 0x1000
-	i += vA
-	i += vA
-	load v7
+	#i_next_next mem_copy_read 0x1000
+	#i += vA
+	#i += vA
+	#load v7
 
-	i := 0
-	i += vA
-	i += vA
+	#i := 0
+	#i += vA
+	#i += vA
 
-	save v7
+	#save v7
 
-	vA += 4
-	if vA != 0x00 then jump mem_copy_loop
+	#vA += 4
+	#if vA != 0x00 then jump mem_copy_loop
 
 	jump copy_complete_do_game
+	0 0 0 0 0 0 0 0
+	0 0 0 0 0 0
+
+	: bank_stash
+	0 0 0 0 0 0 0 0
+	0 0 0 0 0 0 0 0
+
+# And we can put our bank loader here:
+
+: bank_load
+	i := bank_source
+	save v1
+	vE := 0
+	loop
+		i_next_next bank_source 0
+		i += vE
+		i += vE
+		load v7
+		i := 0
+		i += vE
+		i += vE
+		save v7
+		vE += 4
+		if vE != 0 then
+	again
+	i := bank_stash
+	load vF
+	return
 
 ##############################
 # So I have had to impliment to-data, and to-code in order to continue working on this project
@@ -316,6 +360,9 @@
 
 to-data
 
+bank_init BNK_gameplay
+
+bank_end
 
 : garden_spirit_1_xy_list_a
 # 240
@@ -745,8 +792,10 @@ ob 17   5 3
 -1
 
 : level_garden_6
-tr 0    2 2
-tr 4    5 4
+#tr 0    2 2
+#tr 4    5 4
+tr 0    0 0
+tr 4    6 6
 ob 16   3 3
 # Define a spirit:
 sp 0	3 3    garden_spirit_1_xy_list_a  garden_spirit_1_xy_list_b
@@ -2379,6 +2428,7 @@ to-data
 to-code
 
 : copy_complete_do_game
+
 	loadflags v3
 	v0 := 60
 	v1 := 59
@@ -2408,8 +2458,15 @@ to-code
 	# Clean out enemy variables:
 	clean_enemy_variables
 	# Enter the level select loop:
+
+	# We need to bank switch to the level select:
+	bank_switch BNK_level_select
 	level_select_mode
 
+	# Load the gameplay bank:
+	bank_switch BNK_gameplay
+
+	# Clear registers:
 	reset_for_new_game_loop
 
 	# We are now in the 'gameplay loop'
@@ -3056,6 +3113,15 @@ jump SetupOffPosX
 	# Then we must return, and, we jumped here, so
 ;
 
+: unreap_with_effect
+	v2 := sweeper_state_reap_2_sweep
+	sweeper_goto_state
+	i := long qtex_sweepreapxor
+	v0 := 2
+	v1 := 29
+	qtex
+	jump swap_reap
+
 : swap_reap_with_effect
 	v2 := sweeper_state_sweep_2_reap
 	sweeper_goto_state
@@ -3142,7 +3208,8 @@ jump SetupOffPosX
 
 	# We use up to v8 in this function, which is ok and doesn't affect normal gameplay
 
-	v2 := random 0x01
+	#v2 := random 0x01
+	v2 := 1
 	i := cleave_restore_flip
 	save v2 - v2
 	if v2 == 0 then	i := address_crosshair_1_data_memory
@@ -3310,14 +3377,23 @@ jump SetupOffPosX
 
 	# what is vF?
 
+	# We know we hit the spirit because vF is true
+	# But we must erase the remaining pixels:
 	if vF != 0 begin
 
+		bank_switch BNK_full_cleave
+
 		full_cleave
+
+		bank_switch BNK_gameplay
 
 		# We erase the spirit as part of full cleave:
 		#spirit_auto_undraw
 		# We need to erase the data tho:
 		remove_spirit
+		unreap_with_effect
+		# Special value for unreaping:
+		v9 := 2
 	end
 
 	: trigger_pull_skip_reap_routines
@@ -3500,8 +3576,12 @@ jump SetupOffPosX
 
 		# At this point none of our registers matter
 		add_spirit
+	end
 
-
+	if v9 == 2 begin
+		i := lowmem_register_stash_f_step
+		load frame_stepper - frame_stepper
+		draw_crosshairs_from_memory
 	end
 
 	i := lowmem_register_stash
@@ -3521,449 +3601,6 @@ jump SetupOffPosX
 ;
 
 
-
-: full_cleave
-
-# So step one is definitely re-ascertain my limits by using my knowledge of my sweep line's octant data, 
-# apply the bounding box, reassess the line to the start of that region for reach iteration, then navigate
-# it pixel by pixel on axis, leaping out off of the axis a sane distance of N, applying the pixel filter back
-# N times back to the line. Then I have to decide if I run to the 'end' and then turn the whole process on it's head...
-# no that's awful... maybe I... do one side of the line and then 'fix' my starting conditions slightly and resume
-# for the 'other' side of the line?? Yeah... I... I think that's the right approach.
-
-	# So, this is going to be incredibly challenging
-	# A lot of the rotation code is already baked
-	# And here's me trying to add in some extra eggs right at the end...
-
-	#                        0 
-	#   -   1100 | 1110   -  
-	#      -     |     -
-	#   1010  -  |  -   0000
-	#  --------- X ----------
-	#   1000  -  |  -   0010
-	#      -     |     -
-	#   -   0110 | 0100   -
-	#                        
-
-	#:alias mob_draw_x vD
-	#:alias mob_draw_y vC
-	#:alias Tr  vB   # Rotation
-	#:alias TrZ vA   # Rotation Zone
-	# v9 : keeps track of our working rotation zone
-	# v8 : I believe currently contains the maximum on axis value before arriving at other crosshair
-	# v7 
-	# v6
-	#:alias subpx_step v5 # This value is still correct
-	#:alias off_axis v4
-	#:alias on_axis v3
-
-	#:alias cross_y v1
-	#:alias cross_x v0
-
-	# Now based on the value of the *actual line that we rendered* we can pick our correct starting limit
-	# for the 'on axis' value
-
-	# Step 1, did we use the normal or flipped version of our current value in TRZ?
-
-	# Recover current value of TrZ and Tr. note that this Tr counts clockwise, and does not reflect the
-	# angle to horizontal or vertical
-
-	# Get framestepper and UNDRAW The crosshairs, so we do not cleave them:
-	i := lowmem_register_stash_f_step
-	load frame_stepper - frame_stepper
-	draw_crosshairs_from_memory
-
-	# Load up the stashed rotation data:
-	i := lowmem_register_stash_r_data
-	load TrZ - Tr
-
-	# Trigger pull will update the value it selected into here:
-	:next cleave_restore_flip
-	v2 := 0
-
-	# Now, bear in mind that if you start at crosshair 1 (not flipped) that you navigate *backwards from it* to get to the target
-	# If you start from crosshair 2, you navigate *forwards* to get to the target
-
-	# Are we working from crosshair 1, or crosshair 2?
-	# == 1 means we work from crosshair 2
-
-	# If we work from crosshair 1, our rotation zone *FROM THE CROSSHAIR* is flipped
-	# If we work from crosshair 2, our rotation zone is the same as the 'players' perception
-	if v2 == 0 begin
-		# For our purposes, TrZ must be 'inverted' to the other side of the circle
-		# To do this we XOR in 0b00001000
-		vF := 0b00001000
-		# Flip our rotation zone to the other side
-		TrZ ^= vF
-	end
-	# else it was not flipped!
-
-	# The lowest two bits do not help us select our correct limit value
-	v9 := 0b11111100
-	v9 &= TrZ
-
-	# v9 now contains 0b0??00, a 4 byte stride that tells us which value to use as our limit
-	# 00 = mob_draw_x + 16
-	# 01 = mob_draw_y + 16
-	# 10 = mob_draw_x - 16
-	# 11 = mob_draw_y - 16
-
-	# We then pit this versus our crosshair's X or Y position, I guess
-	# Remember we have the luxury of knowing that we HAVE hit the spirit
-
-	# We can obtain our starting point here:
-	: cleave_start
-	i := crosshair_2_data	# <-------------------------- this command
-	load v2
-	# This is the 'starting point' of our line
-	# including the subpixels that were achieved when we hit this location
-	# Note that this is the 'drawing' position of a 3x3 sprite, so mathematically:
-	cross_x += 1
-	cross_y += 1
-	# v2 contains the initial subpixel value, that we need to flip:
-	vF := 0xFF
-	v2 ^= vF
-	v2 += 1
-
-	# We now have the 'starting point' of our line
-
-	# v9 also tells us which crosshair value to use as our 'starting' 0 on axis value to compute our 'limit'
-	# 00 => we want to start at on_axis = cross_x - (mob_draw_x + 16)
-	# 01 => we want to start at on_axis = cross_y - (mob_draw_y + 16)
-	# 10 => we want to start at on_axis = (mob_draw_x - 16) - cross_x
-	# 11 => we want to start at on_axis = (mob_draw_y - 16) - cross_y
-
-	# Can we simplify this:
-	# 00 => we want to start at on_axis = cross_x - mob_draw_x - 16
-	# 01 => we want to start at on_axis = cross_y - mob_draw_y - 16
-	# 10 => we want to start at on_axis = mob_draw_x - cross_x - 16
-	# 11 => we want to start at on_axis = mob_draw_y - cross_y - 16
-
-	# How can we achieve this with v9 as it is?
-	# We could assign a value of 0 to our working register, which can be uhm
-	v7 := 0
-	# v7 I guess
-
-	# So, no matter what we do we try to subtract 16 from it, and if we underflow
-	# clamp to maybe 0?
-
-	# I mean, I think so anyway
-
-	# Realistically these will never be less than 0 because the spirit will never straddle the border wall
-
-	to-data
-
-	# In order to do a 4 byte mem copy, we need 4 bytes next to each other...
-	: cleave_register_table
-	v7 -= cross_x
-	v7 += mob_draw_x
-
-	v7 -= cross_y
-	v7 += mob_draw_y
-
-	v7 += cross_x
-	v7 -= mob_draw_x
-
-	v7 += cross_y
-	v7 -= mob_draw_y
-
-	: cleave_address_table
-	# 00
-	:pointer cut3_sprite_down
-	:pointer cut3_sprite_up
-
-	# 01
-	:pointer cut3_sprite_right
-	:pointer cut3_sprite_left
-
-	# 10
-	:pointer cut3_sprite_up
-	:pointer cut3_sprite_down
-
-	# 11
-	:pointer cut3_sprite_left
-	:pointer cut3_sprite_right
-
-	to-code
-
-	# vC, D E and F can be used until we load the spirit XY
-
-	# Set up the cleaving sprites:
-	i := long cleave_address_table
-	i += v9
-
-
-
-	load vC - vF
-	i := cleave_mainside_sprite
-	save vC - vD
-	i := cleave_offside_sprite
-	save vE - vF
-
-
-	# Set up the register table:
-
-	i := long cleave_register_table
-	i += v9
-	
-	load vC - vF
-	i := cleave_calc_starting_on_axis
-	save vC - vF
-
-
-	# We need the X Y coords of the spirit
-	i := lomem_spirit_handy_xy
-	load mob_draw_x - mob_draw_y
-
-	# Move to center of sprite:
-	mob_draw_x += 3
-	mob_draw_y += 3
-
-	: cleave_calc_starting_on_axis
-	v7 += 0
-	v7 += 0
-
-	:const cleave_zone_border 12
-
-	vF := cleave_zone_border
-	v7 -= vF
-	# I think this is the underflow?
-	if vF == 0 then v7 := 0
-
-
-	# This gives us our starting value of on axis for this cleave
-	# We also need to work out the starting off axis value for this cleave
-
-	# We need to add v7 instaces of subpx_step to our crosshair's v2 value to get our starting subpixels
-	# This also has the benefit of allowing us to compute our starting X and Y coordinate
-	
-	# So, starting at our crosshair X and Y coordinate, we want to run cleave apply the current value of 
-	# v7 times
-	# Then we will have our 'starting' true X Y and subpixel coordinates
-
-	loop
-		# We can just step on 1 pixel at a time:
-		on_axis := 1
-		off_axis := 0
-		v2 += subpx_step
-		if vf != 0 then off_axis := 1
-		# Easy 45 degree mode:
-		if subpx_step == 0xFF then off_axis := 1
-		
-		# Apply this:
-		cleave_apply
-
-		#i := line_v_2px_max_low_mem
-		#sprite v0 v1 1
-
-		v7 += -1
-		if v7 != 0 then
-	again
-
-	# cross_x, cross_y, and v2 now reflect our starting cleave location
-
-	# Because we are using 3x3 spritse, we offset both of these by 1:
-	cross_x += -1
-	cross_y += -1
-
-	i := cleave_start_location
-	save v2
-
-	# Now we can load this memory back for each pass
-
-
-	# We also need to select the correct 'blend' sprite
-
-	# At this time, v9 still contains the high bits of the rotation nibble
-	# We are however about to destroy this data by using it to count the number of pixels remaining
-	# We should likely select our cleave sprite at this time
-
-	:calc cleave_zone_total_length { cleave_zone_border * 2 }
-	:calc cleave_zone_reverse_border { 0 - cleave_zone_border }
-	
-	# Load up the stashed rotation data:
-	# i := lowmem_register_stash_r_data
-	# load TrZ - Tr
-
-	# TrZ is vA and Tr is vB
-
-	vE := 4
-	# This is the loop start for the entire cleave procedure
-	loop
-		# Start a new loop:
-
-		# This restores Cross X and Cross Y etc
-		i := cleave_start_location
-		load v2
-
-		# This is our loop variable for going the stretch across the sprite
-		# we'll be taking this many steps across our line from our saved starting point
-		v7 := cleave_zone_total_length
-
-		# This is the loop start for a whole single cleave pass across the whole playfield.
-		loop
-
-
-			# The contents of this loop are performed twice.
-			# The first time is the 'main side'
-			# The second time is the 'off side'
-			# These can be either side, depending on the value of TrZ, but, we can use our precomputed sprite
-			# addresses to know which cut sprite to use
-			# This should allow for diagonal cuts, too. Maybe?
-
-			# Step one is to set our selves up for the MAIN side and the FIRST DRAW
-
-			# The first draw is always at the 'extreme' of the cut zone, where we want to REMOVE the pixel,
-			# rather that cleave it
-			# We can unroll the first tick of the loop to allow for this, as the faster this code is
-			# the better
-
-			# So, we actually want to use a different sprite, just a single pixel
-			# This sprite exists as cut3_sprite_cleanup
-			# The main issue is that we flip between main side and offside, as this is mathetically simpler
-			# Than traversing the subpixel line twice
-			# This means that we want to defer to one sprite the first time, and one sprite the 2nd time
-
-			# First Pass setup:
-			# As we'll need it for Pass 2, we save our current 'step' location:
-			i := cleave_step_location
-			save v1
-
-			# As we're about to set them, we can use vC and vD to do our memory ops:
-			i := cleave_mainside_sprite
-			if vE == 0x1 then i := cleave_final_sprite
-			load vC - vD
-			i := cleave_loop_sprite_select
-			save vC - vD
-
-			# We take our current location, and move cleave_zone_border pixels on the off axis:
-			vC := cleave_zone_border
-			# And determine that our direction is '-1'
-			vD := -1
-
-			# That concludes the set up. The 2nd pass will re-enter here:
-
-			: cleave_second_pass_entry
-
-			# We select our cleanup sprite:
-			i := long cut3_sprite_cleanup
-
-			v9 := cleave_zone_border
-			on_axis := 0
-			off_axis := vC 
-			# Step OUT by vC. We set this up to be the zone border value
-			cleave_apply 
-
-			# And now we know we'll need to count down in the future
-			off_axis := vD
-
-			# Perform unrolled first stage of loop:
-			# Only undraw the sprite if no collision occurs:
-			sprite cross_x cross_y 3
-			if vF == 0 then sprite cross_x cross_y 3
-
-			# Now we can go in by 1:
-			cleave_apply
-
-			# Select the correct sprite for the actual loop:
-			i_next_next cleave_loop_sprite_select 0x0000
-			
-			loop
-
-				# Apply sprite
-				sprite cross_x cross_y 3
-
-				# Debug:
-				#vB := vF
-				#vF := 2
-				#f_delay
-				#vF := vB
-
-				# If we hit something, don't undraw, otherwise, remove it:
-				if vF == 0 then sprite cross_x cross_y 3
-				# If we did hit something then we instead, do not undraw it, moving the pixel in the direction of the
-				# sprite
-
-				# Take another step closer back to the line:
-				cleave_apply
-
-				# Count down back to the line:
-				v9 += -1
-				# We count down to 1, rather than 0, as we unrolled the first pass to save like 2 bytes of memory
-				if v9 != 1 then
-			again
-
-			# 2nd pass setup (and final restoration)
-			# Restore the line position:
-			i := cleave_step_location
-			load v1
-
-			# If we completed our 2nd pass to get here, we're done:
-			if vC == cleave_zone_reverse_border then jump cleave_second_pass_complete
-
-			# Once again, as we're about to set them, we can use vC and vD to do our memory ops:
-
-			i := cleave_offside_sprite
-			if vE == 0x1 then i := cleave_final_sprite
-			load vC - vD
-			i := cleave_loop_sprite_select
-			save vC - vD
-
-			vC := cleave_zone_reverse_border
-			vD := 1
-
-			jump cleave_second_pass_entry
-
-			# Self mod code dump zone:
-			: cleave_mainside_sprite
-			0x00 0x00
-
-			: cleave_offside_sprite
-			0x00 0x00
-
-			: cleave_final_sprite
-			:pointer cut3_sprite_cleanup
-
-
-			: cleave_second_pass_complete
-
-			# Animate our boy:
-			service_sweeper
-			q_delay
-			# Now we move one step along the line:
-			on_axis := 1
-			v2 += subpx_step
-			off_axis := vF
-			cleave_apply
-
-			# We've now moved one pixel along the line, cleaving both side
-			# How many times do we need to do this?
-
-			v7 += -1
-			if v7 != 0 then
-		again
-
-		vF := 2
-		f_delay_with_sweeper
-		# How many times should we spread the sprite?
-		# Maybe just like, 4
-		vE += -1
-
-		if vE != 0 then
-	again
-
-
-;
-
-: cleave_step_location
-0 0
-
-: cleave_start_location
-0 0 0
-
-: cleave_apply # This gets modified
-	apply_on_axis_main
-;
 
 : disable_spirit_function
 	i := code_spirit_enable
@@ -4238,6 +3875,10 @@ jump SetupOffPosX
 			if v9 != 0 begin
 				plane 1
 				sprite cross_x cross_y 1
+			end
+
+			if v9 == 2 begin
+				if vF == 0 then sprite cross_x cross_y 1
 			end
 
 
@@ -5062,413 +4703,6 @@ to-code
 #;
 }
 
-to-ex-code
-
-# This is the location of my extra secret code that will replace sub 0x200
-
-:calc mem_measure { HERE }
-: level_select_mode
-	# Captures gameplay and allows the player to select a level
-	reset_for_new_game_loop
-	# no registers matter on entry to this area.
-	# The screen also is wiped
-
-	:alias chapter_sublevel v8
-	# :alias total_levels_unlocked v9
-	# :alias total_levels_complete vA
-	:alias current_chapter vB
-	# mob_draw_x & y are vC and vD
-
-	i := level_select_last
-	load chapter_sublevel - current_chapter
-
-	draw_chapter_art
-
-	:alias chapter_offset v7
-	i := long mul_8
-	i += current_chapter
-	# We now know where to index into chapters
-	load chapter_offset - chapter_offset
-	# Chapter Offset is the memory offset to the start of the chapter that we're in
-
-	# We can reuse vB because we do not need to use current_chapter past this point
-	:alias ls_maximum_right vB
-
-	# First, draw the layout:
-	mob_draw_x := 0
-	mob_draw_y := 1
-
-	# v4 and v5 become available after this first loop
-	:alias completed_levels_drawn v4
-
-	completed_levels_drawn := 0
-	ls_maximum_right := 0
-
-	# v6 will be our selection within the chapter:
-	:alias ls_cur v6
-	ls_cur := 0
-
-	# This is going to draw the chapter from left to right, apparently:
-	loop
-		i := long chapters
-		i += chapter_offset
-		i += ls_cur
-
-		load v0
-		# What are we looking at here:
-
-		# -1 is the 'beginning' of the game, marked with a dot
-		if v0 == -1 begin
-			mob_draw_x += 4
-			i := long level_select_marker_first
-			sprite mob_draw_x mob_draw_y  8
-			mob_draw_x += 8
-			jump lv_select_end_loop
-		end
-
-		# If v0 is in this region, then it is a chapter change button at the start or end of a chapter
-		if v0 >= 0x80 begin
-			# This must be at the end:
-			if ls_cur == 7 begin
-				# If we have not drawn 6 complete levels this chapter, we can't proceed:
-				if completed_levels_drawn != 6 then	jump lv_select_end_loop
-
-				i := long padded_line_h
-				sprite mob_draw_x mob_draw_y 4
-				mob_draw_x += 8
-				i := long level_select_marker_next
-
-				# We can also select this entry now:
-				ls_maximum_right := ls_cur
-			end
-			# This must be at the start:
-			if ls_cur == 0 begin
-				mob_draw_x += 4
-				i := long level_select_marker_prev
-			end
-
-			sprite mob_draw_x mob_draw_y  8
-			mob_draw_x += 8
-		end
-
-		# Is this level number unlocked?
-		# if v0 < total_levels_unlocked begin
-		if v0 < v9 begin
-
-			i := long padded_line_h
-			sprite mob_draw_x mob_draw_y 4
-			mob_draw_x += 8
-			i := long level_select_marker
-			sprite mob_draw_x mob_draw_y  8
-
-			# Is this level also completed?
-			# if v0 < total_levels_complete begin
-			if v0 < vA begin
-				completed_levels_drawn += 1
-				i := long level_select_complete
-				sprite mob_draw_x mob_draw_y  8
-			end
-
-			ls_maximum_right := ls_cur
-
-			mob_draw_x += 8
-		end
-
-		: lv_select_end_loop
-		ls_cur += 1
-		if ls_cur != 8 then
-	again
-
-	# This gives us a rendered 'chapter'
-
-	##############################################
-	##############################################
-	# This is our point of separation for many register fields
-	# total_levels_unlocked is available
-	# v9
-	# total_levels_complete is available
-	# vA
-
-	:alias ls_stats_displayed_status vA
-	ls_stats_displayed_status := 0
-
-	# And we often loop back here:
-	: level_select_move_select_arrow
-
-	# We will store the 'true' number of this level somewhere, and that somewhere
-	# should be below v7, because we use our high registers in draw_level_select_stats
-	# However we also stash them all, so, our current values should be maintained
-	:alias ls_true_level_number v5
-
-	# Populate this value:
-	i := long chapters
-	i += chapter_offset
-	i += chapter_sublevel
-	load ls_true_level_number - ls_true_level_number
-
-	# My goal is to persist the text if we need it still, so that
-	# we don't undraw things we don't need to
-	# This function requires ls_true_level_number be valid
-	draw_level_select_stats_only
-	draw_level_select_stats_text_only
-
-	# Actual select loop:
-	# Use chapter_sublevel 0 - 7 to select what we're looking at:
-
-	draw_level_select_mainchar
-
-	# Multiply our sublevel by 16:
-	i := long sublevel_arrow_start
-	i += chapter_sublevel
-	load mob_draw_x - mob_draw_x
-
-	#mob_draw_x := v0
-	#mob_draw_x += mob_draw_x
-	# And add 4, for the X offset:
-	#mob_draw_x += 4
-	mob_draw_y := 9
-	# Draw the selection arrow:
-	i := long level_select_pointer
-	sprite mob_draw_x mob_draw_y 8
-
-	# We can only go as high as v4, this gives us 5 registers to work with.
-	# If we're going to draw text and such like, I think it's probably wise to stash our registers:
-
-	# We do a simple input loop here:
-	: level_select_reject_input
-	# Take input into v0:
-	v0 := key
-	# Left
-	if v0 == 7 begin
-		if chapter_sublevel == 0 then jump level_select_reject_input
-
-		sprite mob_draw_x mob_draw_y  8
-		# Needs to happen before the sublevel changes?
-		draw_level_select_stats_only
-		draw_level_select_mainchar
-		chapter_sublevel += -1
-
-		jump level_select_move_select_arrow
-	end
-
-	# Right
-	if v0 == 9 begin
-		if chapter_sublevel == ls_maximum_right then jump level_select_reject_input
-
-		sprite mob_draw_x mob_draw_y  8
-		# Needs to happen before the sublevel changes?
-		draw_level_select_stats_only
-		draw_level_select_mainchar
-		chapter_sublevel += 1
-		
-		jump level_select_move_select_arrow
-	end
-
-	# Pulling the trigger:
-	if v0 == 0xE begin
-		if ls_true_level_number == -1 then jump level_select_reject_input
-
-		# Change chapter
-		if ls_true_level_number >= 0x80 begin
-			ls_true_level_number -= 0x80
-			current_chapter := ls_true_level_number
-
-			if chapter_sublevel == 0 then chapter_sublevel := 6
-			if chapter_sublevel == 7 then chapter_sublevel := 1
-
-			i := level_select_last
-			save chapter_sublevel - chapter_sublevel
-			load v2
-			save current_chapter - current_chapter
-
-			# This invalidates ls_maximum_right, but, that's ok because we are
-			# going to regenerate it due to chapter change:
-			jump level_select_mode
-		end
-
-		# Otherwise we select this level to play
-		# First we save which level in the chapter we're doing:
-		i := level_select_last
-		save chapter_sublevel - chapter_sublevel
-
-		# Save the level to play into the appropriate location:
-		i := load_level_number
-		save ls_true_level_number - ls_true_level_number
-
-		return
-	end
-
-	# Level unlock cheat:
-	#if v0 == 1 begin
-	#	i := level_select_last
-	#	load v0 - v3
-	#	v0 := 0
-	#	v2 := v1
-	#	v1 += 1
-	#	save v0 - v3
-	#	jump level_select_mode
-	#end
-	#if v0 == 2 begin
-	#	i := level_select_flagsave
-	#	v0 := 1
-	#	v1 := 0
-	#	save v1
-	#	saveflags v1
-	#	jump level_select_mode
-	#end
-
-	jump level_select_reject_input
-
-: draw_level_select_mainchar
-	if chapter_sublevel == 0 then return
-	if chapter_sublevel == 7 then return
-
-	i := long levels_char_position
-	i += ls_true_level_number
-	i += ls_true_level_number
-	i += ls_true_level_number
-	load v2
-	# these are now the coords
-	i := long sweeper_nothing_flip
-	i += v2
-	sprite v0 v1 0
-;
-
-: draw_level_select_stats_text_only
-	# Our normal goal is 2, and received in mob_draw_x
-
-	if chapter_sublevel == 0 then mob_draw_x := 0
-	if chapter_sublevel == 7 then mob_draw_x := 0
-
-	#mob_draw_x := 0
-	#mob_draw_y := 0
-	# if we are already at our goal, then, return:
-	if mob_draw_x == ls_stats_displayed_status then return
-
-	# I did a weird truth table thing for this and it turns out there's a way 'faster' way to do this:
-
-#	if v6 == 0 begin
-#		if ls_stats_displayed_status == 2 then mob_draw_x := 1
-#		mob_draw_y := 1
-#	end
-
-#	if v6 == 2 begin
-#		if ls_stats_displayed_status != 1 then mob_draw_y := 1
-#		mob_draw_x := 1
-	#end
-
-	#if v6 == 1 begin
-	#	if ls_stats_displayed_status == 2 then mob_draw_x := 1
-	#	if ls_stats_displayed_status == 0 then mob_draw_y := 1
-	#end
-
-	v6 := mob_draw_x
-	mob_draw_x += ls_stats_displayed_status
-	ls_stats_displayed_status := v6
-
-	if mob_draw_x != 1 begin
-		ez_print level_select_stats_text
-	end
-
-	if mob_draw_x != 3 begin
-		ez_print level_select_text
-	end
-;
-
-:calc mem_measure { HERE - mem_measure }
-
-end-ex-code
-
-: draw_level_select_stats_only
-	if chapter_sublevel == 0 then return
-	if chapter_sublevel == 7 then return
-
-	i := long register_dump
-	save vB
-
-	# Can we display the stats associated with this level
-	# We need to know what actual level we are actually looking at here
-
-	# index to score table for this level:
-	# We mul_4 the true level, giving us 64 true levels:
-	v0 <<= ls_true_level_number
-	v0 <<= v0
-	# Then we add this twice.
-	# This is because we likely will have > 32 levels
-	i := long levels_saved_scores
-	i += v0
-	i += v0
-
-#   7           8            9                a      b                       c           d
-# Last Sweeps				 Sweep Par				Player Score Max 					Player Score Min
-# 				Last Score					  Player Sweeps Max				  Player Sweeps Min
-
-	# Our regiters are stashed so we can do whatever we want now
-	# we will be using v0, v1 and v2 to draw numbers
-	# And we will be messing up our I pointer
-	load v7 - vE
-
-	v1 := 17
-	v2 := 23
-	v0 := 0
-	q_dig
-
-	# ls_true_level_number is v5:
-	v0 := ls_true_level_number
-	v0 += 1
-	draw_bcd_v1v2
-
-	v2 += 12
-	v0 := v9
-	q_dig
-
-	# Then We only draw these if the player has completed it:
-
-	if vB == 0 begin
-		mob_draw_x := 1
-		jump level_select_stats_not_complete
-	end
-
-	v2 += 12
-	v0 := v7
-	q_dig
-
-	v2 += 6
-	v1 -= 12
-
-	# v0 := v?? is 0x80 0xY0. Therefore, v0 := v8 = 0x80 0x80
-	: line_v_2px_max_low_mem
-	v0 := v8
-	draw_bcd_v1v2
-
-	:monitor line_v_2px_max_low_mem 4
-
-	v1 := 110
-	v2 := 23
-
-	v0 := vB
-	draw_bcd_v1v2
-
-	v1 := 110
-	v0 := vD
-	v2 := 53
-	draw_bcd_v1v2
-
-	v0 := vA
-	v2 := 29
-	q_dig
-
-	v0 := vC
-	v2 := 47
-	q_dig
-
-	mob_draw_x := 2
-	: level_select_stats_not_complete
-	# Restore registers:
-	i := long register_dump
-	load vB
-;
-
 
 : increase_sweeps
 	# Mem is at 449 before golf
@@ -5565,16 +4799,6 @@ end-ex-code
 0
 : reap_mode
 0
-
-# Level select menu:
-# 0: current level
-# 1: total levels unlocked
-# 2: total levels competed
-# 3: current chapter
-: level_select_last
- 1 
- : level_select_flagsave 
- 	1 0 0 # 0 0 0
 
 
 ##################################
@@ -6595,26 +5819,945 @@ to-code
 
 
 
+############## WORLD OF BANKS:
+
+# Level select menu:
+# 0: current level
+# 1: total levels unlocked
+# 2: total levels competed
+# 3: current chapter
+: level_select_last
+ 1 
+ : level_select_flagsave 
+ 	1 0 0 # 0 0 0
+
+
+	# Level select related aliases
+	:alias ls_true_level_number v5
+	:alias chapter_offset v7
+	:alias chapter_sublevel v8
+	# :alias total_levels_unlocked v9
+	# :alias total_levels_complete vA
+	:alias current_chapter vB
+	# mob_draw_x & y are vC and vD
+
+
+: draw_level_select_stats_only
+	if chapter_sublevel == 0 then return
+	if chapter_sublevel == 7 then return
+
+	i := long register_dump
+	save vB
+
+	# Can we display the stats associated with this level
+	# We need to know what actual level we are actually looking at here
+
+	# index to score table for this level:
+	# We mul_4 the true level, giving us 64 true levels:
+	v0 <<= ls_true_level_number
+	v0 <<= v0
+	# Then we add this twice.
+	# This is because we likely will have > 32 levels
+	i := long levels_saved_scores
+	i += v0
+	i += v0
+
+#   7           8            9                a      b                       c           d
+# Last Sweeps				 Sweep Par				Player Score Max 					Player Score Min
+# 				Last Score					  Player Sweeps Max				  Player Sweeps Min
+
+	# Our regiters are stashed so we can do whatever we want now
+	# we will be using v0, v1 and v2 to draw numbers
+	# And we will be messing up our I pointer
+	load v7 - vE
+
+	v1 := 17
+	v2 := 23
+	v0 := 0
+	q_dig
+
+	# ls_true_level_number is v5:
+	v0 := ls_true_level_number
+	v0 += 1
+	draw_bcd_v1v2
+
+	v2 += 12
+	v0 := v9
+	q_dig
+
+	# Then We only draw these if the player has completed it:
+
+	if vB == 0 begin
+		mob_draw_x := 1
+		jump level_select_stats_not_complete
+	end
+
+	v2 += 12
+	v0 := v7
+	q_dig
+
+	v2 += 6
+	v1 -= 12
+
+	# v0 := v?? is 0x80 0xY0. Therefore, v0 := v8 = 0x80 0x80
+	: line_v_2px_max_low_mem
+	v0 := v8
+	draw_bcd_v1v2
+
+	:monitor line_v_2px_max_low_mem 4
+
+	v1 := 110
+	v2 := 23
+
+	v0 := vB
+	draw_bcd_v1v2
+
+	v1 := 110
+	v0 := vD
+	v2 := 53
+	draw_bcd_v1v2
+
+	v0 := vA
+	v2 := 29
+	q_dig
+
+	v0 := vC
+	v2 := 47
+	q_dig
+
+	mob_draw_x := 2
+	: level_select_stats_not_complete
+	# Restore registers:
+	i := long register_dump
+	load vB
+;
+
+# We want to end up SAVING THIS CODE into DATA, so we go to data first:
+
 to-data
+# Then start our bank:
+bank_init BNK_level_select
+
+# This is the location of my extra secret code that will replace sub 0x200
+
+:calc MEM_BNK_SIZE_LEVEL { HERE }
+: level_select_mode
+
+
+	# Captures gameplay and allows the player to select a level
+	reset_for_new_game_loop
+	# no registers matter on entry to this area.
+	# The screen also is wiped
+
+
+
+	i := level_select_last
+	load chapter_sublevel - current_chapter
+
+	draw_chapter_art
+
+	
+	i := long mul_8
+	i += current_chapter
+	# We now know where to index into chapters
+	load chapter_offset - chapter_offset
+	# Chapter Offset is the memory offset to the start of the chapter that we're in
+
+	# We can reuse vB because we do not need to use current_chapter past this point
+	:alias ls_maximum_right vB
+
+	# First, draw the layout:
+	mob_draw_x := 0
+	mob_draw_y := 1
+
+	# v4 and v5 become available after this first loop
+	:alias completed_levels_drawn v4
+
+	completed_levels_drawn := 0
+	ls_maximum_right := 0
+
+	# v6 will be our selection within the chapter:
+	:alias ls_cur v6
+	ls_cur := 0
+
+	# This is going to draw the chapter from left to right, apparently:
+	loop
+		i := long chapters
+		i += chapter_offset
+		i += ls_cur
+
+		load v0
+		# What are we looking at here:
+
+		# -1 is the 'beginning' of the game, marked with a dot
+		if v0 == -1 begin
+			mob_draw_x += 4
+			i := long level_select_marker_first
+			sprite mob_draw_x mob_draw_y  8
+			mob_draw_x += 8
+			jump lv_select_end_loop
+		end
+
+		# If v0 is in this region, then it is a chapter change button at the start or end of a chapter
+		if v0 >= 0x80 begin
+			# This must be at the end:
+			if ls_cur == 7 begin
+				# If we have not drawn 6 complete levels this chapter, we can't proceed:
+				if completed_levels_drawn != 6 then	jump lv_select_end_loop
+
+				i := long padded_line_h
+				sprite mob_draw_x mob_draw_y 4
+				mob_draw_x += 8
+				i := long level_select_marker_next
+
+				# We can also select this entry now:
+				ls_maximum_right := ls_cur
+			end
+			# This must be at the start:
+			if ls_cur == 0 begin
+				mob_draw_x += 4
+				i := long level_select_marker_prev
+			end
+
+			sprite mob_draw_x mob_draw_y  8
+			mob_draw_x += 8
+		end
+
+		# Is this level number unlocked?
+		# if v0 < total_levels_unlocked begin
+		if v0 < v9 begin
+
+			i := long padded_line_h
+			sprite mob_draw_x mob_draw_y 4
+			mob_draw_x += 8
+			i := long level_select_marker
+			sprite mob_draw_x mob_draw_y  8
+
+			# Is this level also completed?
+			# if v0 < total_levels_complete begin
+			if v0 < vA begin
+				completed_levels_drawn += 1
+				i := long level_select_complete
+				sprite mob_draw_x mob_draw_y  8
+			end
+
+			ls_maximum_right := ls_cur
+
+			mob_draw_x += 8
+		end
+
+		: lv_select_end_loop
+		ls_cur += 1
+		if ls_cur != 8 then
+	again
+
+	# This gives us a rendered 'chapter'
+
+	##############################################
+	##############################################
+	# This is our point of separation for many register fields
+	# total_levels_unlocked is available
+	# v9
+	# total_levels_complete is available
+	# vA
+
+	:alias ls_stats_displayed_status vA
+	ls_stats_displayed_status := 0
+
+	# And we often loop back here:
+	: level_select_move_select_arrow
+
+	# We will store the 'true' number of this level somewhere, and that somewhere
+	# should be below v7, because we use our high registers in draw_level_select_stats
+	# However we also stash them all, so, our current values should be maintained
+	# :alias ls_true_level_number v5
+
+	# Populate this value:
+	i := long chapters
+	i += chapter_offset
+	i += chapter_sublevel
+	load ls_true_level_number - ls_true_level_number
+
+	# My goal is to persist the text if we need it still, so that
+	# we don't undraw things we don't need to
+	# This function requires ls_true_level_number be valid
+	draw_level_select_stats_only
+	draw_level_select_stats_text_only
+
+	# Actual select loop:
+	# Use chapter_sublevel 0 - 7 to select what we're looking at:
+
+	draw_level_select_mainchar
+
+	# Multiply our sublevel by 16:
+	i := long sublevel_arrow_start
+	i += chapter_sublevel
+	load mob_draw_x - mob_draw_x
+
+	#mob_draw_x := v0
+	#mob_draw_x += mob_draw_x
+	# And add 4, for the X offset:
+	#mob_draw_x += 4
+	mob_draw_y := 9
+	# Draw the selection arrow:
+	i := long level_select_pointer
+	sprite mob_draw_x mob_draw_y 8
+
+	# We can only go as high as v4, this gives us 5 registers to work with.
+	# If we're going to draw text and such like, I think it's probably wise to stash our registers:
+
+	# We do a simple input loop here:
+	: level_select_reject_input
+	# Take input into v0:
+	v0 := key
+	# Left
+	if v0 == 7 begin
+		if chapter_sublevel == 0 then jump level_select_reject_input
+
+		sprite mob_draw_x mob_draw_y  8
+		# Needs to happen before the sublevel changes?
+		draw_level_select_stats_only
+		draw_level_select_mainchar
+		chapter_sublevel += -1
+
+		jump level_select_move_select_arrow
+	end
+
+	# Right
+	if v0 == 9 begin
+		if chapter_sublevel == ls_maximum_right then jump level_select_reject_input
+
+		sprite mob_draw_x mob_draw_y  8
+		# Needs to happen before the sublevel changes?
+		draw_level_select_stats_only
+		draw_level_select_mainchar
+		chapter_sublevel += 1
+		
+		jump level_select_move_select_arrow
+	end
+
+	# Pulling the trigger:
+	if v0 == 0xE begin
+		if ls_true_level_number == -1 then jump level_select_reject_input
+
+		# Change chapter
+		if ls_true_level_number >= 0x80 begin
+			ls_true_level_number -= 0x80
+			current_chapter := ls_true_level_number
+
+			if chapter_sublevel == 0 then chapter_sublevel := 6
+			if chapter_sublevel == 7 then chapter_sublevel := 1
+
+			i := level_select_last
+			save chapter_sublevel - chapter_sublevel
+			load v2
+			save current_chapter - current_chapter
+
+			# This invalidates ls_maximum_right, but, that's ok because we are
+			# going to regenerate it due to chapter change:
+			jump level_select_mode
+		end
+
+		# Otherwise we select this level to play
+		# First we save which level in the chapter we're doing:
+		i := level_select_last
+		save chapter_sublevel - chapter_sublevel
+
+		# Save the level to play into the appropriate location:
+		i := load_level_number
+		save ls_true_level_number - ls_true_level_number
+
+		return
+	end
+
+	# Level unlock cheat:
+	#if v0 == 1 begin
+	#	i := level_select_last
+	#	load v0 - v3
+	#	v0 := 0
+	#	v2 := v1
+	#	v1 += 1
+	#	save v0 - v3
+	#	jump level_select_mode
+	#end
+	#if v0 == 2 begin
+	#	i := level_select_flagsave
+	#	v0 := 1
+	#	v1 := 0
+	#	save v1
+	#	saveflags v1
+	#	jump level_select_mode
+	#end
+
+	jump level_select_reject_input
+
+: draw_level_select_mainchar
+	if chapter_sublevel == 0 then return
+	if chapter_sublevel == 7 then return
+
+	i := long levels_char_position
+	i += ls_true_level_number
+	i += ls_true_level_number
+	i += ls_true_level_number
+	load v2
+	# these are now the coords
+	i := long sweeper_nothing_flip
+	i += v2
+	sprite v0 v1 0
+;
+
+: draw_level_select_stats_text_only
+	# Our normal goal is 2, and received in mob_draw_x
+
+	if chapter_sublevel == 0 then mob_draw_x := 0
+	if chapter_sublevel == 7 then mob_draw_x := 0
+
+	#mob_draw_x := 0
+	#mob_draw_y := 0
+	# if we are already at our goal, then, return:
+	if mob_draw_x == ls_stats_displayed_status then return
+
+	# I did a weird truth table thing for this and it turns out there's a way 'faster' way to do this:
+
+#	if v6 == 0 begin
+#		if ls_stats_displayed_status == 2 then mob_draw_x := 1
+#		mob_draw_y := 1
+#	end
+
+#	if v6 == 2 begin
+#		if ls_stats_displayed_status != 1 then mob_draw_y := 1
+#		mob_draw_x := 1
+	#end
+
+	#if v6 == 1 begin
+	#	if ls_stats_displayed_status == 2 then mob_draw_x := 1
+	#	if ls_stats_displayed_status == 0 then mob_draw_y := 1
+	#end
+
+	v6 := mob_draw_x
+	mob_draw_x += ls_stats_displayed_status
+	ls_stats_displayed_status := v6
+
+	if mob_draw_x != 1 begin
+		ez_print level_select_stats_text
+	end
+
+	if mob_draw_x != 3 begin
+		ez_print level_select_text
+	end
+;
+
+:calc MEM_BNK_SIZE_LEVEL { HERE - MEM_BNK_SIZE_LEVEL }
+bank_end
+
+# We're still in data ram
+
+
+##############################
+# Cleave stuff:
+# to-data
+	# In order to do a 4 byte mem copy, we need 4 bytes next to each other...
+	: cleave_register_table
+	# 00
+	v7 -= cross_x
+	v7 += mob_draw_x
+
+	# 01
+	v7 -= cross_y
+	v7 += mob_draw_y
+
+	# 10
+	v7 += cross_x
+	v7 -= mob_draw_x
+
+	# 11
+	v7 += cross_y
+	v7 -= mob_draw_y
+
+	: cleave_address_table
+	# 00
+	:pointer cut3_sprite_down
+	:pointer cut3_sprite_up
+
+	# 01
+	:pointer cut3_sprite_right
+	:pointer cut3_sprite_left
+
+	# 10
+	:pointer cut3_sprite_up
+	:pointer cut3_sprite_down
+
+	# 11
+	:pointer cut3_sprite_left
+	:pointer cut3_sprite_right
+
+to-code
+
+# This gets modified by other stuff and must be referenced by the bank, so, it must be before the bank:
+: cleave_apply 
+	apply_on_axis_main
+;
+
+: cleave_start
+i := crosshair_2_data
+: cleave_restore_flip
+0
+
+to-data
+bank_init BNK_full_cleave
+
+:calc MEM_BNK_SIZE_CLEAVE { HERE }
+
+# Self mod code dump zone:
+: cleave_mainside_sprite
+0x00 0x00
+
+: cleave_offside_sprite
+0x00 0x00
+
+: cleave_step_location
+0 0
+
+: cleave_start_location
+0 0 0
+
+: full_cleave
+
+# So step one is definitely re-ascertain my limits by using my knowledge of my sweep line's octant data, 
+# apply the bounding box, reassess the line to the start of that region for reach iteration, then navigate
+# it pixel by pixel on axis, leaping out off of the axis a sane distance of N, applying the pixel filter back
+# N times back to the line. Then I have to decide if I run to the 'end' and then turn the whole process on it's head...
+# no that's awful... maybe I... do one side of the line and then 'fix' my starting conditions slightly and resume
+# for the 'other' side of the line?? Yeah... I... I think that's the right approach.
+
+	# So, this is going to be incredibly challenging
+	# A lot of the rotation code is already baked
+	# And here's me trying to add in some extra eggs right at the end...
+
+	#                        0 
+	#   -   1100 | 1110   -  
+	#      -     |     -
+	#   1010  -  |  -   0000
+	#  --------- X ----------
+	#   1000  -  |  -   0010
+	#      -     |     -
+	#   -   0110 | 0100   -
+	#                        
+
+	#:alias mob_draw_x vD
+	#:alias mob_draw_y vC
+	#:alias Tr  vB   # Rotation
+	#:alias TrZ vA   # Rotation Zone
+	# v9 : keeps track of our working rotation zone
+	# v8 : I believe currently contains the maximum on axis value before arriving at other crosshair
+	# v7 
+	# v6
+	#:alias subpx_step v5 # This value is still correct
+	#:alias off_axis v4
+	#:alias on_axis v3
+
+	#:alias cross_y v1
+	#:alias cross_x v0
+
+	# Now based on the value of the *actual line that we rendered* we can pick our correct starting limit
+	# for the 'on axis' value
+
+	# Step 1, did we use the normal or flipped version of our current value in TRZ?
+
+	# Recover current value of TrZ and Tr. note that this Tr counts clockwise, and does not reflect the
+	# angle to horizontal or vertical
+
+	# Get framestepper and UNDRAW The crosshairs, so we do not cleave them:
+	i := lowmem_register_stash_f_step
+	load frame_stepper - frame_stepper
+	draw_crosshairs_from_memory
+
+	# This gets us our v2, as well
+	i := cleave_start
+	load v2
+
+	i := cleave_start_in_bank
+	save v1
+
+
+
+	# Trigger pull will update the value it selected into here:
+	#:next cleave_restore_flip
+	#v2 := 0
+
+	# Load up the stashed rotation data:
+	i := lowmem_register_stash_r_data
+	load TrZ - Tr
+
+	# Now, bear in mind that if you start at crosshair 1 (not flipped) that you navigate *backwards from it* to get to the target
+	# If you start from crosshair 2, you navigate *forwards* to get to the target
+
+	# Are we working from crosshair 1, or crosshair 2?
+	# == 1 means we work from crosshair 2
+
+	# For some reason, straight lines select the wrong cut3 pattern
+	:breakpoint straight_line_a
+	# If we work from crosshair 1, our rotation zone *FROM THE CROSSHAIR* is flipped
+	# If we work from crosshair 2, our rotation zone is the same as the 'players' perception
+	if v2 == 0 begin
+		# For our purposes, TrZ must be 'inverted' to the other side of the circle
+		# To do this we XOR in 0b00001000
+		vF := 0b00001000
+		# Flip our rotation zone to the other side
+		TrZ ^= vF
+	end
+	# else it was not flipped!
+
+	# The lowest two bits do not help us select our correct limit value
+	v9 := 0b11111100
+	v9 &= TrZ
+
+	# v9 now contains 0b0??00, a 4 byte stride that tells us which value to use as our limit
+	# 00 = mob_draw_x + 16
+	# 01 = mob_draw_y + 16
+	# 10 = mob_draw_x - 16
+	# 11 = mob_draw_y - 16
+
+	# We then pit this versus our crosshair's X or Y position, I guess
+	# Remember we have the luxury of knowing that we HAVE hit the spirit
+
+	# We can obtain our starting point here:
+	: cleave_start_in_bank
+	i := crosshair_2_data	# <-------------------------- this command
+	load v2
+	# This is the 'starting point' of our line
+	# including the subpixels that were achieved when we hit this location
+	# Note that this is the 'drawing' position of a 3x3 sprite, so mathematically:
+	cross_x += 1
+	cross_y += 1
+	# v2 contains the initial subpixel value, that we need to flip:
+	vF := 0xFF
+	v2 ^= vF
+	v2 += 1
+
+	# We now have the 'starting point' of our line
+
+	# v9 also tells us which crosshair value to use as our 'starting' 0 on axis value to compute our 'limit'
+	# 00 => we want to start at on_axis = cross_x - (mob_draw_x + 16)
+	# 01 => we want to start at on_axis = cross_y - (mob_draw_y + 16)
+	# 10 => we want to start at on_axis = (mob_draw_x - 16) - cross_x
+	# 11 => we want to start at on_axis = (mob_draw_y - 16) - cross_y
+
+	# Can we simplify this:
+	# 00 => we want to start at on_axis = cross_x - mob_draw_x - 16
+	# 01 => we want to start at on_axis = cross_y - mob_draw_y - 16
+	# 10 => we want to start at on_axis = mob_draw_x - cross_x - 16
+	# 11 => we want to start at on_axis = mob_draw_y - cross_y - 16
+
+	# How can we achieve this with v9 as it is?
+	# We could assign a value of 0 to our working register, which can be uhm
+	v7 := 0
+	# v7 I guess
+
+	# So, no matter what we do we try to subtract 16 from it, and if we underflow
+	# clamp to maybe 0?
+
+	# I mean, I think so anyway
+
+	# Realistically these will never be less than 0 because the spirit will never straddle the border wall
+
+
+	# vC, D E and F can be used until we load the spirit XY
+
+	# Turns out, for the SPRITES, we care a lot more about what direction we're facing, because off
+	# axis will push us either up or down depending on if we're above or below the 0 degrees line
+	# This goes a long way to explaining why it felt like it was backwards.
+
+	# Set up the cleaving sprites:
+	i := long cleave_address_table
+	i += v9
+
+	load vC - vF
+	i := cleave_mainside_sprite
+	save vC - vD
+	i := cleave_offside_sprite
+	save vE - vF
+
+
+	# Set up the register table:
+
+	i := long cleave_register_table
+	i += v9
+	
+	load vC - vF
+	i := cleave_calc_starting_on_axis
+	save vC - vF
+
+
+	# We need the X Y coords of the spirit
+	i := lomem_spirit_handy_xy
+	load mob_draw_x - mob_draw_y
+
+	# Move to center of sprite:
+	mob_draw_x += 3
+	mob_draw_y += 3
+
+	: cleave_calc_starting_on_axis
+	v7 += 0
+	v7 += 0
+
+	:const cleave_zone_border 12
+
+	vF := cleave_zone_border
+	v7 -= vF
+	# I think this is the underflow?
+	if vF == 0 then v7 := 0
+
+
+	# This gives us our starting value of on axis for this cleave
+	# We also need to work out the starting off axis value for this cleave
+
+	# We need to add v7 instaces of subpx_step to our crosshair's v2 value to get our starting subpixels
+	# This also has the benefit of allowing us to compute our starting X and Y coordinate
+	
+	# So, starting at our crosshair X and Y coordinate, we want to run cleave apply the current value of 
+	# v7 times
+	# Then we will have our 'starting' true X Y and subpixel coordinates
+
+	loop
+		# We can just step on 1 pixel at a time:
+		on_axis := 1
+		off_axis := 0
+		v2 += subpx_step
+		if vf != 0 then off_axis := 1
+		# Easy 45 degree mode:
+		if subpx_step == 0xFF then off_axis := 1
+		
+		# Apply this:
+		cleave_apply
+
+		#:breakpoint p
+		#i := line_v_2px_max_low_mem
+		#sprite v0 v1 1
+
+		v7 += -1
+		if v7 != 0 then
+	again
+
+	# cross_x, cross_y, and v2 now reflect our starting cleave location
+
+	# Because we are using 3x3 spritse, we offset both of these by 1:
+	cross_x += -1
+	cross_y += -1
+
+	i := cleave_start_location
+	save v2
+
+	# Now we can load this memory back for each pass
+
+
+	# We also need to select the correct 'blend' sprite
+
+	# At this time, v9 still contains the high bits of the rotation nibble
+	# We are however about to destroy this data by using it to count the number of pixels remaining
+	# We should likely select our cleave sprite at this time
+
+	:calc cleave_zone_total_length { cleave_zone_border * 2 }
+	:calc cleave_zone_reverse_border { 0 - cleave_zone_border }
+	
+	# Load up the stashed rotation data:
+	# i := lowmem_register_stash_r_data
+	# load TrZ - Tr
+
+	# TrZ is vA and Tr is vB
+
+	vE := 4
+	# This is the loop start for the entire cleave procedure
+	loop
+		# Start a new loop:
+
+		# This restores Cross X and Cross Y etc
+		i := cleave_start_location
+		load v2
+
+		# This is our loop variable for going the stretch across the sprite
+		# we'll be taking this many steps across our line from our saved starting point
+		v7 := cleave_zone_total_length
+
+		# This is the loop start for a whole single cleave pass across the whole playfield.
+		loop
+
+
+			# The contents of this loop are performed twice.
+			# The first time is the 'main side'
+			# The second time is the 'off side'
+			# These can be either side, depending on the value of TrZ, but, we can use our precomputed sprite
+			# addresses to know which cut sprite to use
+			# This should allow for diagonal cuts, too. Maybe?
+
+			# Step one is to set our selves up for the MAIN side and the FIRST DRAW
+
+			# The first draw is always at the 'extreme' of the cut zone, where we want to REMOVE the pixel,
+			# rather that cleave it
+			# We can unroll the first tick of the loop to allow for this, as the faster this code is
+			# the better
+
+			# So, we actually want to use a different sprite, just a single pixel
+			# This sprite exists as cut3_sprite_cleanup
+			# The main issue is that we flip between main side and offside, as this is mathetically simpler
+			# Than traversing the subpixel line twice
+			# This means that we want to defer to one sprite the first time, and one sprite the 2nd time
+
+			# First Pass setup:
+			# As we'll need it for Pass 2, we save our current 'step' location:
+			i := cleave_step_location
+			save v1
+
+			# As we're about to set them, we can use vC and vD to do our memory ops:
+			i := cleave_mainside_sprite
+			if vE == 0x1 then i := cleave_final_sprite
+			load vC - vD
+			i := cleave_loop_sprite_select
+			save vC - vD
+
+			# We take our current location, and move cleave_zone_border pixels on the off axis:
+			vC := cleave_zone_border
+			# And determine that our direction is '-1'
+			vD := -1
+
+			# That concludes the set up. The 2nd pass will re-enter here:
+
+			: cleave_second_pass_entry
+
+			# We select our cleanup sprite:
+			i := long cut3_sprite_cleanup
+
+			:breakpoint move_out
+
+			v9 := cleave_zone_border
+			on_axis := 0
+			off_axis := vC 
+			# Step OUT by vC. We set this up to be the zone border value
+			cleave_apply
+
+			# And now we know we'll need to count down in the future
+			off_axis := vD
+
+			# Perform unrolled first stage of loop:
+			# Only undraw the sprite if no collision occurs:
+			sprite cross_x cross_y 3
+			if vF == 0 then sprite cross_x cross_y 3
+
+			# Now we can go in by 1:
+			cleave_apply
+
+			# Select the correct sprite for the actual loop:
+			i_next_next cleave_loop_sprite_select 0x0000
+			
+			loop
+
+				# Apply sprite
+				sprite cross_x cross_y 3
+
+				# Debug:
+				vB := vF
+				vF := 2
+				f_delay
+				vF := vB
+
+				# If we hit something, don't undraw, otherwise, remove it:
+				if vF == 0 then sprite cross_x cross_y 3
+				# If we did hit something then we instead, do not undraw it, moving the pixel in the direction of the
+				# sprite
+
+				# Take another step closer back to the line:
+				cleave_apply
+
+				# Count down back to the line:
+				v9 += -1
+				# We count down to 1, rather than 0, as we unrolled the first pass to save like 2 bytes of memory
+				if v9 != 1 then
+			again
+
+			# 2nd pass setup (and final restoration)
+			# Restore the line position:
+			i := cleave_step_location
+			load v1
+
+			# If we completed our 2nd pass to get here, we're done:
+			if vC == cleave_zone_reverse_border then jump cleave_second_pass_complete
+
+			# Once again, as we're about to set them, we can use vC and vD to do our memory ops:
+
+			i := cleave_offside_sprite
+			if vE == 0x1 then i := cleave_final_sprite
+			load vC - vD
+			i := cleave_loop_sprite_select
+			save vC - vD
+
+			vC := cleave_zone_reverse_border
+			vD := 1
+
+			jump cleave_second_pass_entry
+
+			: cleave_final_sprite
+			:pointer cut3_sprite_cleanup
+
+
+			: cleave_second_pass_complete
+
+			# Animate our boy:
+			service_sweeper
+			q_delay
+			# Now we move one step along the line:
+			on_axis := 1
+			v2 += subpx_step
+			off_axis := vF
+			cleave_apply
+
+			# We've now moved one pixel along the line, cleaving both side
+			# How many times do we need to do this?
+
+			v7 += -1
+			if v7 != 0 then
+		again
+
+		vF := 2
+		f_delay_with_sweeper
+		# How many times should we spread the sprite?
+		# Maybe just like, 4
+		vE += -1
+
+		if vE != 0 then
+	again
+
+;
+
+
+
+:calc MEM_BNK_SIZE_CLEAVE { HERE - MEM_BNK_SIZE_CLEAVE }
+bank_end
+
+#to-data
 
 : FREE_CODE_BYTES
 :byte { FREE >> 8 }
 :byte { FREE }
 :monitor FREE_CODE_BYTES "%2i"
 
-: USED_EX_CODE_BYTES
-:byte { mem_measure >> 8 }
-:byte { mem_measure }
-:monitor USED_EX_CODE_BYTES "%2i"
+: Level_Bank_Used
+:byte { MEM_BNK_SIZE_LEVEL >> 8 }
+:byte { MEM_BNK_SIZE_LEVEL }
+:monitor Level_Bank_Used "%2i"
 
-: FREE_EX_CODE_BYTES
-:byte { ( 512 - mem_measure ) >> 8 }
-:byte { 512 - mem_measure } 
-:monitor FREE_EX_CODE_BYTES "%2i"
+: Level_Bank_Free
+:byte { ( 512 - MEM_BNK_SIZE_LEVEL ) >> 8 }
+:byte { 512 - MEM_BNK_SIZE_LEVEL } 
+:monitor Level_Bank_Free "%2i"
+
+: Cleave_Bank_Used
+:byte { MEM_BNK_SIZE_CLEAVE >> 8 }
+:byte { MEM_BNK_SIZE_CLEAVE }
+:monitor Cleave_Bank_Used "%2i"
 
 :monitor spirit_detect_data 10
 
+:monitor lowmem_register_stash 16
+
 #:monitor 0x1000 64
 #:monitor 0x0000 64
-
-copy_ex_code
