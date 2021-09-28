@@ -360,12 +360,8 @@
 
 to-data
 
-bank_init BNK_gameplay
-
-bank_end
-
 : garden_spirit_1_xy_list_a
-# 240
+# 240 x2 
  60 28 60 28 60 28 60 29 61 29 61 29 61 28 62 28
  62 27 62 27 62 26 62 26 61 25 60 25 59 25 59 25
  58 26 57 26 57 27 57 28 57 29 57 29 58 30 58 31
@@ -396,9 +392,8 @@ bank_end
  71 28 70 28 70 29 69 29 68 29 67 28 66 28 65 27
  64 27 64 26 63 26 62 25 61 25 61 25 60 25 59 25
  58 26 58 26 58 27 58 28 59 28 59 29 59 29 60 29
--1
 : garden_spirit_1_xy_list_b
-# 240
+# 240 x2
  60 28 60 28 60 29 61 29 61 29 61 28 61 28 62 28
  62 27 62 27 62 26 61 25 61 25 60 25 59 25 58 26
  58 26 57 26 57 27 57 28 57 29 58 30 58 30 58 31
@@ -541,9 +536,9 @@ bank_end
 
 
 : tutorial_end_text_6
-0xFE 0x2B 0x05 0x55 0x14 0x00 0x4B 0x28 0x41 0x1E 0xFE 0x28 0x0E 0x0A 0x55 0x28
-0x5F 0x5F 0x14 0x55 0x5A 0xFE 0x2E 0x2D 0x28 0x5A 0xF9 0x41 0x46 0x5F 0xFE 0x2B
-0x36 0x00 0x37 0x37 0x46 0x6E 0x14 0x0F 0xFF 
+0xFE 0x25 0x05 0x6E 0x00 0x5F 0x0A 0x23 0xF9 0x19 0x46 0x55 0xFE 0x28 0x0E 0x0A
+0x55 0x28 0x5F 0x5F 0x14 0x55 0x5A 0xFE 0x25 0x2D 0x55 0x14 0x00 0x4B 0xF9 0x6E
+0x28 0x5F 0x23 0xFE 0x32 0x36 0x0A 0x00 0x55 0x14 0xFF 
 
 : tutorial_text_loopup
 :pointer tutorial_text_1
@@ -588,8 +583,26 @@ bank_end
 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
 
-
-
+: chapter_art_1
+0x00 0x1F 0x3F 0x20 0x20 0x2F 0x20 0xE0 0x2F 0x20 0x20 0x3F 0x00 0x00 0x00 0xF0
+0xF0 0x30 0x30 0xB0 0x30 0x3F 0xB0 0x30 0x30 0xE0 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x00 0x00 0xFF 0x00 0x00 0x00 0x00 0x00 0x1E 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0xFF 0x00 0x00 0x00 0x00 0x00 0x00 0x03 0x03 0x03 0x03 0x03 0x03 0x03 0xFF
+0x00 0x00 0x00 0x00 0x07 0x01 0xF8 0xF8 0xF8 0xF8 0xF8 0xF8 0xF8 0xFF 0x00 0x00
+0x00 0x00 0xC0 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xFF 0x00 0x00 0x00 0x3B
+0x1E 0x1E 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x3E 0x26
+0x27 0x27 0x20 0x20 0x20 0x3F 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x80 0xC0
+0xC0 0xC0 0xC0 0x80 0x00 0x00 0x00 0x00 0x00 0x00 0x07 0x04 0x04 0x04 0x07 0x01
+0x02 0x04 0x00 0x00 0x00 0x00 0x00 0x08 0xC0 0xC0 0xC0 0xC0 0xC0 0x00 0x80 0x40
+0x00 0x00 0x00 0x00 0x00 0x7F 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x10 0x20 0x20 0x00 0x00 0x3F 0x7F 0x43 0x43 0x43 0x43 0x43 0x43 0x43 0x43
+0x7E 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x01 0x01
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xE0 0x20 0x00 0x00
+0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x07 0x04 0x04 0x04
+0x04 0x04 0x07 0x08 0x0C 0x00 0x00 0x00 0x07 0x04 0x80 0x00 0x00 0x00 0x00 0x00
+0xFF 0x00 0x00 0x00 0x00 0x00 0x80 0x80 0xC0 0x40 0x40 0x40 0x40 0x40 0xC0 0x60
+0x20 0x00 0x00 0x00 0x00 0x00
 
 
 
@@ -597,6 +610,7 @@ bank_end
 : chapter_art_addresses
 # 0:
 :pointer chapter_art_0
+:pointer chapter_art_1
 
 
 : wipey_wipe
@@ -632,16 +646,16 @@ bank_end
 # These levels really are already indexed by their level number:
 : levels_saved_scores
 a_level_save  0 1
-a_level_save  1 4
-a_level_save  2 4
-a_level_save  3 4
+a_level_save  1 1
+a_level_save  2 1
+a_level_save  3 1
 a_level_save  4 4
 a_level_save  5 4
 a_level_save  6 4
-a_level_save  7 4
-a_level_save  8 4
-a_level_save  9 4
-a_level_save 10 4
+a_level_save  7 3
+a_level_save  8 3
+a_level_save  9 3
+a_level_save 10 2
 a_level_save 11 4
 
 : levels_char_position
@@ -652,6 +666,13 @@ a_level_save 11 4
 52 31 32 # 4
 59 25 0 # 5
 71 22 0 # 6
+
+56 44 0 # 7
+42 41 32 # 8
+41 26 32 # 9
+59 25 0 # 10
+65 36 0 # 11
+77 19 32 # 12
 
 # Ironically it's much easier for us to define vertical columns in memory
 # I fixed it now the game grid makes sense
@@ -742,13 +763,14 @@ a_level_save 11 4
 
 :const spirit_byte_len 8
 
-:macro sp v X Y addr_1 addr_2 {
+:macro sp v X Y addr_1 f n {
 	:byte { X }
 	:byte { Y }
 	:byte { 0xC0 }
 	:byte { v * 8 }
 	:pointer addr_1
-	:pointer addr_2
+	:byte { f }
+	:byte { n }
 }
 
 : levels
@@ -784,9 +806,9 @@ ob 17   5 3
 : level_garden_6
 tr 0    2 2
 tr 4    5 4
-ob 16   3 3
+ob 26   3 3
 # Define a spirit:
-sp 0	3 3    garden_spirit_1_xy_list_a  garden_spirit_1_xy_list_b
+sp 0	3 3    garden_spirit_1_xy_list_a  26 0
 -1
 
 # Living Room 1
@@ -917,34 +939,28 @@ tr 15	1	5
 		e_Chompo e_Wiggler e_Chompo 
 
 : level_lr_2_enemy
-	12
-		8 8 16 32
-		24 16 24 8
-		16 24 32 32
+	5
+		e_Chompo e_Chompo e_Skulkulon e_Angero
+		e_Snaker e_Skulkulon
 
 : level_lr_3_enemy
-	12
-		40 40 24 24
-		24 32 24 32
-		0 0 24 24
+	5
+		e_NeckKing e_Angero e_Chompo e_Wiggler
+		e_NeckKing 
 
 : level_lr_4_enemy
-	11
-		56 32 0 56
-		0 0 56 32
-		32 32 56 
+	4
+		e_Angero e_Skulkulon e_Angero e_Snaker
 
 : level_lr_5_enemy
-	9
-		16 24 40 40
-		24 16 16 16
-		40 
+	6
+		e_Wiggler e_Wiggler e_Batato e_Chompo
+		e_Skulkulon e_Skulkulon 
 
 : level_lr_6_enemy
-	10
-		64 48 64 16
-		16 48 48 16
-		64 64 
+	6
+		e_Wiggler  e_Skulkulon e_Snaker e_Pincing
+		e_Snaker e_Batato
 
 # These are 2 bytes:
 : levels_load
@@ -1073,7 +1089,7 @@ cross_x += off_axis
 
 : furniture
 0x00 0x00 0x20 0x4A 0x4E 0x7E 0x3E 0x00 0x18 0x24 0x24 0x3C 0x3C 0x3C 0x38 0x00
-0x10 0x30 0x30 0x3E 0x3E 0x36 0x36 0x24 0x1E 0x12 0x12 0x3E 0x7E 0x7E 0x5A 0x48
+0x10 0x30 0x30 0x3E 0x3E 0x36 0x36 0x24 0x1E 0x12 0x16 0x3E 0x7E 0x7E 0x5A 0x48
 0x3F 0x7F 0x43 0x7F 0x43 0x7F 0x43 0x7E 0x00 0x10 0x28 0x08 0x1C 0x1C 0x1C 0x18
 0x3F 0x7F 0xFF 0xA5 0xA5 0xA5 0xA5 0x84 0x00 0x00 0x3F 0x7E 0x08 0x1E 0x3C 0x00
 0x00 0x0F 0x1A 0x3F 0x40 0x7F 0x7F 0x7F 0x00 0xFE 0x4A 0xFE 0x06 0xFE 0xFE 0xFC
@@ -1081,13 +1097,13 @@ cross_x += off_axis
 0x00 0x0F 0x10 0x2F 0x5F 0x70 0x7F 0x60 0x00 0x3C 0xC2 0xFA 0xF6 0x1E 0xFE 0x0C
 0x18 0x1C 0x08 0x08 0x08 0x08 0x18 0x24 0xAB 0xFF 0xA5 0xA5 0xFF 0xD5 0xD5 0xFE
 0x00 0x14 0x2A 0x14 0x08 0x1C 0x08 0x00 0x00 0x50 0xAA 0x55 0x2A 0x74 0x2E 0x04
+0x1C 0x08 0x08 0x08 0x2A 0x7F 0x1C 0x00 0x18 0x18 0x24 0x42 0xA5 0xFF 0x3C 0x00
+0x00 0x7E 0x3F 0x09 0x50 0x91 0xA6 0x78 0x14 0x1C 0x3C 0x7C 0x7E 0x58 0x18 0x3C
+0x00 0x3C 0x24 0x7E 0x7E 0x7E 0x7E 0x00 0x02 0x06 0x06 0x1E 0x3E 0x36 0x36 0x24
 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
-0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+0x00 0x38 0x28 0x38 0x08 0x1C 0x08 0x00 0x3C 0x24 0x66 0x7E 0x7E 0x7E 0x7E 0x66
+0x00 0x1C 0x14 0x1C 0x1C 0x3E 0x1C 0x1C 0x3C 0x1C 0x18 0x18 0x1C 0x14 0x3E 0x00
+0x00 0x00 0x00 0x28 0x38 0x2A 0x3E 0x3E 0x3C 0x66 0x66 0x7E 0x42 0x42 0x3C 0x00
 
 : trash
 0x00 0x40 0x3C 0x70 0x4E 0x1E 0x08 0x00 0x00 0x34 0x6E 0x1C 0x66 0x38 0x68 0x00
@@ -2701,7 +2717,10 @@ to-code
 
 			# Try to delay only one 60 fps frame most of the time:
 			service_sweeper
+
+			service_ballistic_add
 			q_delay
+			service_ballistic_remove
 
 			# Undraw crosshair
 			draw_vague_crosshair
@@ -2724,7 +2743,9 @@ to-code
 		end
 
 		service_sweeper
+		service_ballistic_add
 		q_delay
+		service_ballistic_remove
 
 		: no_next_crosshair
 		next_crosshair += -1
@@ -3214,7 +3235,9 @@ jump SetupOffPosX
 	i := cleave_apply
 	save v1
 
-	increase_sweeps
+	# Can we precompute a critter velocity that's hit by this sweep?
+	# This blows out our v2 value for TrZ manipulating
+	# increase_sweeps
 	
 	# Load up the on subpixels and onaxis value for crosshair 1
 	i := crosshair_1_subpixels
@@ -3263,6 +3286,15 @@ jump SetupOffPosX
 	i := lowmem_register_stash
 	save vF
 
+
+	if v2 != 0 begin
+		# if we selected 'mirror' mode, flip TrZ for now.
+		v2 := 0x08
+		TrZ ^= v2
+	end
+
+	
+
 		# Our loop here:
 		# v0 = cross_x
 		# v1 = cross_y
@@ -3276,6 +3308,11 @@ jump SetupOffPosX
 		# v9 = Player was in Reap Mode
 		# vE = Allows for the delay of frames
 
+
+	i := reap_mode
+	load v9 - v9
+
+	if v9 == 0 then increase_sweeps
 
 	# Available:
 
@@ -3302,9 +3339,6 @@ jump SetupOffPosX
 	v7 := c_trigger_pull_init
 	v8 := 0
 
-	i := reap_mode
-	load v9 - v9
-
 	v2 := sweeper_state_reap_spin
 	# Later this can be a random sweep swing:
 	if v9 != 1 then v2 := sweeper_state_sweep1
@@ -3315,7 +3349,9 @@ jump SetupOffPosX
 
 	if v7 != c_trigger_pull_init then jump line_abort_point
 	
+	service_ballistic_add
 	q_delay
+	service_ballistic_remove
 
 	# We now juse the graphics planes to avoid having to undraw all the enemies by just only drawing them
 	# into the plane 2 where the line currently resides
@@ -3331,7 +3367,7 @@ jump SetupOffPosX
 	#load v0
 	# v9 now contains reap state
 
-	
+	# If we are NOT reaping:
 	if v9 == 0 begin
 		plane 2
 		# Test one at a time (as part of v5 being on)
@@ -3524,7 +3560,9 @@ jump SetupOffPosX
 		# Allow a finishing animation:
 		loop
 			service_sweeper
+			service_ballistic_add
 			q_delay
+			service_ballistic_remove
 			#### EXIT AWAAAAY (this is not a subroutine)
 			v0 := 0xE if v0 -key then 
 		again
@@ -3618,8 +3656,8 @@ jump SetupOffPosX
 	i := code_spirit_draw_a
 	save v1
 
-	i := code_spirit_draw_b
-	save v2 - v3
+	# i := code_spirit_draw_b
+	# save v2 - v3
 
 	# Enable the spirit function:
 	i := code_spirit_enable
@@ -3732,12 +3770,16 @@ jump SetupOffPosX
 			jump trigger_skip_empty_mob
 		end
 
+		# This code here means that we DID hit it
+
 		Tx += Tr
 		if Tr != 0 then Tr += 1
 
 		plane 1
 		sprite v0 v1 8
 		plane 2
+
+		send_ballistic
 
 		# Otherwise it does collide, specifically with our line
 		# If that happens, we could remove it from the game here
@@ -3874,7 +3916,9 @@ jump SetupOffPosX
 				service_sweeper
 				plane 2
 				if v9 != 0 then plane 3
+				service_ballistic_add
 				q_delay
+				service_ballistic_remove
 			end
 
 			v6 += -1
@@ -3906,7 +3950,9 @@ jump SetupOffPosX
 	save vF - vF
 	# vF is how many times to run this code
 	service_sweeper
+	service_ballistic_add
 	q_delay
+	service_ballistic_remove
 	i := lomem_f_delay_tracker
 	load vF - vF
 	vF += -1
@@ -3954,22 +4000,30 @@ jump SetupOffPosX
 	load v7
 	i := long enemy_fast_redraw
 
-	v8 := 0
+	clean_easy_loop
 	
-	: repeat_clear_loop
-	loop
-		save v7
-		v8 += 1
-		# Exits after the 2nd pass
-		if v8 == 16 then return
-		# Runs the code below after the first pass:
-		if v8 != 8 then
-	again
+
 
 	i := long enemy_list_wipe
 	load v7
 	i := long enemy_list
-	jump repeat_clear_loop
+	clean_easy_loop
+	
+	i := long ballistic_reset
+	load v7
+	i := long ballistic_critters
+	clean_easy_loop
+;
+
+: clean_easy_loop
+	v8 := 0
+	loop
+		save v7
+		v8 += 1
+		# Exits after the 2nd pass
+		# Runs the code below after the first pass:
+		if v8 != 8 then
+	again
 
 : service_spirit
 	# If we are here, there is a spirit
@@ -3991,7 +4045,12 @@ jump SetupOffPosX
 	# Select which thing to do
 	i_next_next code_spirit_draw_a 0x0000
 	if v4 != 0 begin
-		i_next_next code_spirit_draw_b 0x0000
+		# We effectively just want to step on 240
+		v1 := 240
+		i += v1
+		i += v1
+		# This saves us including the other address? surely?
+		# i_next_next code_spirit_draw_b 0x0000
 	end
 
 	# Step onward:
@@ -4513,6 +4572,7 @@ to-code
 ;
 
 : remove_enemy
+
 	# v6 contains the enemy to remove as x8
 	i := long enemy_list
 	i += v6
@@ -6383,10 +6443,12 @@ bank_init BNK_full_cleave
 	save v1
 
 
+	# Note to self: for ballistic critters, I've started maintaining a flipped version of TrZ, which may be available here
 
 	# Trigger pull will update the value it selected into here:
 	#:next cleave_restore_flip
 	#v2 := 0
+
 
 	# Load up the stashed rotation data:
 	i := lowmem_register_stash_r_data
@@ -6708,7 +6770,11 @@ bank_init BNK_full_cleave
 
 			# Animate our boy:
 			service_sweeper
+
+			# service_ballistic_add
 			q_delay
+			# service_ballistic_remove
+
 			# Now we move one step along the line:
 			on_axis := 1
 			v2 += subpx_step
@@ -6723,7 +6789,14 @@ bank_init BNK_full_cleave
 		again
 
 		vF := 2
-		f_delay_with_sweeper
+
+		# We can't service ballistic critters at this time because we're reaping
+
+		service_sweeper
+		q_delay
+		service_sweeper
+		q_delay
+		# f_delay_with_sweeper
 		# How many times should we spread the sprite?
 		# Maybe just like, 4
 		vE += -1
@@ -6736,6 +6809,236 @@ bank_init BNK_full_cleave
 
 
 :calc MEM_BNK_SIZE_CLEAVE { HERE - MEM_BNK_SIZE_CLEAVE }
+bank_end
+
+# We can use 192 to signify an easy 'this is unused'
+
+# How convinient it fits in 8 bytes
+: ballistic_critters
+# x pos	y pos	critter gfx 	critter id	x sub	y sub	x vel	y vel
+192		0		0				0			0		0		0		0
+
+192 0 0 0 0 0 0 0
+192 0 0 0 0 0 0 0
+192 0 0 0 0 0 0 0
+192 0 0 0 0 0 0 0
+192 0 0 0 0 0 0 0
+192 0 0 0 0 0 0 0
+192 0 0 0 0 0 0 0
+
+: ballistic_reset
+192 0 0 0 0 0 0 0
+
+:monitor ballistic_critters 64
+
+
+#                        0 
+#   -   1100 | 1110   -  
+#      -     |     -
+#   1010  -  |  -   0000
+#  --------- X ----------
+#   1000  -  |  -   0010
+#      -     |     -
+#   -   0110 | 0100   -
+#                        
+
+# These are 'mirrored' from the 0 -> outwards, remember!
+: default_ballistic_velocities # separated by TrZ
+ -100 -64
+ -100 -64
+ -64 -96
+  64 -96
+  100 -64
+  100 -64 
+  64 -32
+ -64 -32
+
+bank_init BNK_gameplay
+
+# In here we can have gameplay stuff happening
+
+: send_ballistic
+	# v0 v1 contain the X Y
+	# v2 contains the index to the brushable mobs index
+	# v3 is some kind of unique enemy type?
+	# v5
+	# ** v6 contains x8 of the enemy id
+	# ** v7 contains the remaining trash for the level
+	# v8 is something to do with line cleanup
+	# v9 is tracking REAP MODE
+	# vA may be free as TrZ
+	# vB as Tr is involved in scoring/sweep count
+	# vC may be free as Ty
+	# vD as Tx is involved in scoring/sweep count
+	# vE should be available
+	# vF is available
+
+	# v0-3 are about to be wiped
+	# v6 must be maintained
+
+	# TrZ is still 'correct' and untouched at this time
+	# We need to know if we're flipped, sure, but, trz gives us enough info to pick a vague starting set of velocities
+
+	vE := 0
+	loop
+		i := long ballistic_critters
+		i += vE
+		# We must find an empy ballistic zone:
+		load vF - vF
+
+		# if it is 0 then we can use it
+		if vF == 192 then jump send_ballistic_location_found
+		vE += 8
+		if vE == 64 then return # we found nothing, so, just erase it
+	again
+
+	: send_ballistic_location_found
+	# Our I will be pointing at the exact right place now
+	# Wrap the vertical position by a screen:
+	v3 := 0
+	v1 += 64
+	save v3
+	v0 := 0
+	v1 := 0
+	save v1	# use this opportuniy to 0 out the sub pixels
+
+	i := long default_ballistic_velocities
+	i += TrZ
+	load v1
+
+	v0 += -16
+	vF := random 0b00011111
+	v0 += vF
+
+	vF := random 0b00001111
+	v1 -= vF
+
+	vE += 6
+	i := long ballistic_critters
+	i += vE
+	save v1
+
+	# cleave_restore_flip tells us whether the value for trz is mirrored or not, I guess
+	# We have access to neither value right now without messing with I and the score system
+	# And initial velocity?
+;
+
+: service_ballistic_remove
+	# Here we want to throw critters around the screen
+	i := long sweeper_service_register_dump 
+	save vF
+	vA := 0
+	jump service_ballistic_internal_loop
+
+	# We can reuse the sweeper service dump as we'll never call that from WITHIN this anyway
+
+: service_ballistic_add
+
+	i := long sweeper_service_register_dump 
+	save vF
+
+	vA := 1
+
+: service_ballistic_internal_loop
+	v9 := 0
+	loop
+		i := long ballistic_critters
+		i += v9
+		load v8
+
+		if v0 == 192 then jump skip_this_ballistic
+
+		if vA != 0 then v3 += 1
+		if v3 == 3 begin
+			v2 += 128
+			v3 := 0
+		end
+
+		plane 1
+		i := long brushable_mobs
+		i += v2
+
+		# otherwise we have a critter to service
+		# We have two modes:
+		#	drawing the critters
+		#	
+		#	undrawing and moving the critters
+		if vA == 0 begin
+			sprite v0 v1 8
+			jump skip_this_ballistic
+		end
+
+		# x pos	y pos	critter gfx 	critter id	x sub	y sub	x vel	y vel
+
+		# So I want to use 60 fps subpixels to achieve coolness
+
+		# What is the sign bit for v6?
+		vB <<= v6
+		if vF == 1 begin
+			# negative velocity
+			vF := 0xFF
+			vB ^= vF
+			v4 -= vB
+			# and if we DONT overflow
+			if vF == 0 then v0 -= 1
+			jump ballistic_handle_y
+		end
+		# positive velocity
+		v4 += vB
+		if vF == 1 then v0 += 1
+
+		: ballistic_handle_y
+
+		# Accelerate under gravity:
+		vF := 0b11111100
+		v7 += 0b00000100
+		v7 &= vF
+		if v7 == 0x80 then v7 := 0x7F
+
+		if v1 == 64 begin
+			v7 := 0
+			v1 := 65
+		end
+
+		vB <<= v7
+		if vF == 1 begin
+			# negative velocity
+			vF := 0xFF
+			vB ^= vF
+			v5 -= vB
+			# and if we DONT overflow
+			if vF == 0 then v1 -= 1
+			jump ballistic_draw_critter
+		end
+		v5 += vB
+		if vF == 1 then v1 += 1
+
+
+		: ballistic_draw_critter
+
+		if v0 > 116 then v0 := 192
+		if v0 < 4   then v0 := 192
+		if v1 > 118 then v0 := 192
+
+		if v0 != 192 then sprite v0 v1 8
+
+		i := long ballistic_critters
+		i += v9
+		save v8
+
+		: skip_this_ballistic
+		v9 += 8
+		if v9 != 64 then
+	again
+
+
+
+	i := long sweeper_service_register_dump
+	load vF
+;
+
+# I want critters that get hit to be cosmetically flung from the level
+
 bank_end
 
 #to-data
