@@ -10,16 +10,16 @@
 
 # What's Missing from Angle of Death
 
-# kinda Title Screen
-# Introduction sequence
+# DONE BABY kinda Title Screen
+# PRETTY MUCH DOOOOONE WOO Introduction sequence
 # done Ingame text
 # done Level Select Animations
 # done Correct Chapter selection
 # done Chapter select score record + display
 # done Proper Enemy Selection for the levels
-# Spirit
-# Spirit Reaping
-# Ending
+# YOU GOT IT Spirit
+# I GOTTA FIX IT BUT Spirit Reaping
+# NOPE LOL Ending
 
 #5 dogs? 5 Areas?
 
@@ -64,6 +64,8 @@
 :alias mob_data_spacing vB
 :alias mob_draw_x vD
 :alias mob_draw_y vC
+
+:alias ls_true_level_number v5
 
 ## Calculate gameplay dimensions:
 
@@ -177,7 +179,7 @@
 # bank_load is positioned later:
 
 :macro bank_switch BANK {
-	i := bank_stash
+	i := long bank_stash
 	save vF
 	:unpack long BANK
 	bank_load
@@ -292,45 +294,33 @@
 	
 	# We now no longer use my 'single bank copy' strategy and need to use several banks of saved memory.
 
-	# We will simply not try to be a clever clogs on load and will instead just behave ourselves.
+	# we need 16 bytes of stash to occupy this space
 
-	# Copy 0x1000 - 0x11FF to
-	#      0x0000 - 0x01FF
+	# Load up saved data:
+	loadflags vF # 2
 
-	# This gives me 512 extra code bytes, at the cost of a few bytes here?
-	# This could be further reduced by continuing to copy an additional 8 bytes
-	# but this new code saves me that many bytes anyway so it's all good
+	# Unlock all levels:
+	v0 := 60 # 4
+	v1 := 59 # 6
+	#
+	#v0 := v0 # 4
+	#v0 := v0 # 6
+	v0 := v0 # 8
 
-	# vA will already be 0:
-	# vA := 0
-#	: mem_copy_loop
+	i := level_select_flagsave	# 10
+	if v0 == 0 then v0 := 1	# 12 + 14
+	save v1	# 16
 
-	#i_next_next mem_copy_read 0x1000
-	#i += vA
-	#i += vA
-	#load v7
+	: go_back_to_title_screen
 
-	#i := 0
-	#i += vA
-	#i += vA
+	bank_switch BNK_titlescreen
 
-	#save v7
-
-	#vA += 4
-	#if vA != 0x00 then jump mem_copy_loop
-
-	jump copy_complete_do_game
-	0 0 0 0 0 0 0 0
-	0 0 0 0 0 0
-
-	: bank_stash
-	0 0 0 0 0 0 0 0
-	0 0 0 0 0 0 0 0
+	jump banked_logo_screen	
 
 # And we can put our bank loader here:
 
 : bank_load
-	i := bank_source
+	i := long bank_source
 	save v1
 	vE := 0
 	loop
@@ -345,9 +335,15 @@
 		vE += 4
 		if vE != 0 then
 	again
-	i := bank_stash
+	i := long bank_stash
 	load vF
 	return
+
+to-data
+: bank_stash
+0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+to-code	
 
 ##############################
 # So I have had to impliment to-data, and to-code in order to continue working on this project
@@ -2442,41 +2438,10 @@ to-code
 	again
 ;
 
-: copy_complete_do_game
-
-	loadflags v3
-
-	# Unlock all levels:
-	v0 := 60
-	v1 := 59
-	#
-
-	i := level_select_flagsave
-	if v0 == 0 then v0 := 1
-	save v1
-
-	# I would like to replace these functions and have the data ready to go
-
-	clear
-
-	bank_switch BNK_titlescreen
-
-	jump banked_logo_screen
-
-	
-
-	
-
 	# This is where we jump back to after a 'gameplay' level to
 	# Get the level select screen back and show progress etc
 	# I guess that makes this a menu redraw or whatever?
 : game_restart
-
-	
-	loop
-		the_any_key
-		if v0 != 0 then
-	again
 
 	hires
 
@@ -2487,6 +2452,7 @@ to-code
 	# We need to bank switch to the level select:
 	bank_switch BNK_level_select
 	level_select_mode
+	if ls_true_level_number == -1 then jump go_back_to_title_screen
 
 	# Load the gameplay bank:
 	bank_switch BNK_gameplay
@@ -3576,7 +3542,6 @@ jump SetupOffPosX
 			v0 -= 1
 			if v0 != 0 then
 		again
-
 
 		# Allow a finishing animation:
 		loop
@@ -5901,7 +5866,7 @@ to-code
 
 
 	# Level select related aliases
-	:alias ls_true_level_number v5
+	#:alias ls_true_level_number v5
 	:alias chapter_offset v7
 	:alias chapter_sublevel v8
 	# :alias total_levels_unlocked v9
@@ -6206,7 +6171,7 @@ bank_init BNK_level_select
 
 	# Pulling the trigger:
 	if v0 == 0xE begin
-		if ls_true_level_number == -1 then jump level_select_reject_input
+		if ls_true_level_number == -1 then return
 
 		# Change chapter
 		if ls_true_level_number >= 0x80 begin
@@ -7000,6 +6965,8 @@ bank_end
 
 bank_init BNK_titlescreen
 
+:calc MEM_BNK_SIZE_TITLE { HERE }
+
 : service_logo_anim
 
 	if v4 == 24 then v2 := 2
@@ -7015,6 +6982,11 @@ bank_init BNK_titlescreen
 
 
 : banked_logo_screen
+
+	clear
+	lores
+	plane 1
+
 	ez_print title_screen_text
 
 	data_sprite 0
@@ -7067,16 +7039,9 @@ bank_init BNK_titlescreen
 
 	again
 
+:calc MEM_BNK_SIZE_TITLE { HERE - MEM_BNK_SIZE_TITLE }
 
 bank_end
-
-
-
-
-
-
-
-
 
 
 ### BALLISTIC/GAMEPLAY BANK
@@ -7124,6 +7089,7 @@ bank_end
 
 bank_init BNK_gameplay
 
+:calc MEM_BNK_SIZE_GAMEPLAY { HERE }
 # In here we can have gameplay stuff happening
 
 : send_ballistic
@@ -7307,30 +7273,41 @@ bank_init BNK_gameplay
 ;
 
 # I want critters that get hit to be cosmetically flung from the level
+:calc MEM_BNK_SIZE_GAMEPLAY { HERE - MEM_BNK_SIZE_GAMEPLAY }
 
 bank_end
 
 #to-data
 
-: FREE_CODE_BYTES
+: code_bytes_free
 :byte { FREE >> 8 }
 :byte { FREE }
 :monitor FREE_CODE_BYTES "%2i"
 
-: Level_Bank_Used
+: Level_Select_Bank_Used
 :byte { MEM_BNK_SIZE_LEVEL >> 8 }
 :byte { MEM_BNK_SIZE_LEVEL }
-:monitor Level_Bank_Used "%2i"
+:monitor Level_Select_Bank_Used "%2i"
 
-: Level_Bank_Free
+: Level_Select_Bank_Free
 :byte { ( 512 - MEM_BNK_SIZE_LEVEL ) >> 8 }
 :byte { 512 - MEM_BNK_SIZE_LEVEL } 
-:monitor Level_Bank_Free "%2i"
+:monitor Level_Select_Bank_Free "%2i"
 
 : Cleave_Bank_Used
 :byte { MEM_BNK_SIZE_CLEAVE >> 8 }
 :byte { MEM_BNK_SIZE_CLEAVE }
 :monitor Cleave_Bank_Used "%2i"
+
+: Title_Bank_Used
+:byte { MEM_BNK_SIZE_TITLE >> 8 }
+:byte { MEM_BNK_SIZE_TITLE }
+:monitor Title_Bank_Used "%2i"
+
+: Game_Bank_Used
+:byte { MEM_BNK_SIZE_GAMEPLAY >> 8 }
+:byte { MEM_BNK_SIZE_GAMEPLAY }
+:monitor Game_Bank_Used "%2i"
 
 :monitor spirit_detect_data 10
 
@@ -7338,3 +7315,9 @@ bank_end
 
 #:monitor 0x1000 64
 #:monitor 0x0000 64
+
+: TOTAL_ROM_SIZE_VALUE
+:calc TOTAL_ROM_SIZE { HERE }
+:byte { TOTAL_ROM_SIZE >> 8 }
+:byte { TOTAL_ROM_SIZE }
+:monitor TOTAL_ROM_SIZE_VALUE "%2i"
